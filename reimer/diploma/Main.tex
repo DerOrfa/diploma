@@ -1,0 +1,251 @@
+\documentclass[halfparskip,a4paper,12pt,headinclude, footexclude]{scrreprt}
+\usepackage{german}
+\usepackage[latin1]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{newlfont}
+\usepackage{hyperref}
+\usepackage{hyphenat}
+\usepackage[german]{varioref}
+
+\usepackage{bibgerm}
+\usepackage[numbers]{natbib}
+\usepackage{url}
+\usepackage[german]{nomencl}
+\usepackage[german]{babel}
+\usepackage{fancyhdr}
+
+\usepackage{xspace}
+\graphicspath{{pics/}}
+
+\addto\captionsgerman{\renewcommand{\figurename}{Abb.}}
+
+\renewcommand*{\figureformat}{\figurename~\thefigure\autodot}
+
+\pagestyle{fancy}
+\lhead{}
+\chead{}
+\rfoot{Seite \thepage}
+\cfoot{}
+\lfoot{3D--Volumendaten auf Consumer--Hardware}
+\renewcommand{\footrulewidth}{0.5pt}
+\textheight=620pt
+
+\newcommand{\fachw}[1]{\emph{#1}} %textsf
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\menge}[1]{\mathbb{#1}}
+\newcommand{\elem}[1]{\in \menge{#1}}
+\newcommand{\elemof}[2]{\in \menge{#1}^#2}
+\newcommand{\eRaum}[1]{$#1 \elemof{R}{3}$\xspace}
+\newcommand{\eR}[1]{$#1 \elem{R}$\xspace}
+\newcommand{\pp}{\ldots}
+\newcommand{\degrees}[1]{\ensuremath{#1^\circ}}
+\newcommand{\gdw}{\leftrightarrow}
+
+\newcommand{\abb}[1]{\figurename \vref{#1}}
+
+\newcommand\email{\begingroup \urlstyle{rm}\Url}
+
+\newcommand{\inclfigure}[5]{
+        \begin{figure}[#1]
+          \begin{center}
+            \fbox{\includegraphics[keepaspectratio=true,width=#3]{#2}}
+          \end{center}
+          \caption{#4}
+          \label{#5}
+        \end{figure}
+}
+
+\newcommand{\inclfigures}[5]{
+  \begin{figure}[hbt]
+    \begin{center}
+      \fbox{
+        \includegraphics[keepaspectratio=true,height=#3]{#1}
+        \includegraphics[keepaspectratio=true,height=#3]{#2}
+      }
+    \end{center}
+    \caption{#4}
+    \label{#5}
+  \end{figure}
+}
+
+\newcommand{\inclfiguress}[6]{
+  \begin{figure}[hbt]
+    \begin{center}
+      \fbox{
+        \includegraphics[keepaspectratio=true,height=#4]{#1}
+        \includegraphics[keepaspectratio=true,height=#4]{#2}
+        \includegraphics[keepaspectratio=true,height=#4]{#3}
+      }
+    \end{center}
+    \caption{#5}
+    \label{#6}
+  \end{figure}
+}
+
+\lstset{language=C++,tabsize=4,frame=single,numbers=left, framerule=0.4pt,frameround=tttt,basicstyle=\tiny}
+
+%% Title Page
+%\title{Entwicklung eines Systems zur Visualisierung von 3D--Volumendaten auf Consumer--Hardware}
+%\author{Enrico Reimer\\
+%{Max-Planck-Institut für Kognitions- und Neurowissenschaften,}\\
+%{Stephanstrasse 1a, 04103 Leipzig, Deutschland}
+%%\thanks{Danke an alle :-)}
+%}
+
+
+
+\makenomenclature
+\renewcommand{\nomname}{Glossar}
+
+\fancypagestyle{plain}{               % change plain style, e.g. 1st page of chapter
+ \fancyhf{}                           % clear all plain header and footer fields
+ \renewcommand{\footrulewidth}{0pt}   % put a 0.5pt thick line over the footer
+ \renewcommand{\headrulewidth}{0pt}   % put no line under the header 
+}
+
+\linespread{1.15}
+\begin{document}
+\input{alg_gloss}
+\input{titlepage}
+
+%\maketitle
+\input{erklaerung}
+\begin{abstract} 
+
+\begin{flushright}\begin{small}
+\emph{Erkennen heißt: zu der halben Wirklichkeit der Sinnenerfahrung die Wahrnehmung des Denkens hinzufügen, auf daß ihr Bild vollständig werde.}\\
+\textsc{J.W. von Goethe}
+\end{small}\end{flushright}
+
+  Neben der Genauigkeit des Messinstruments ist die schnelle und
+  korrekte Interpretation des Gemessenen von zentraler Bedeutung für
+  das Messen selbst. Moderne bildgebende Messsysteme erzeugen heute
+  große Mengen oft dreidimensionaler graphischer Informationen die von
+  Fachleuten interpretiert werden müssen. Diese Diplomarbeit
+  beschäftigt sich mit dem Entwurf und der Implementierung eines
+  Systems zur Visualisierung dreidimensionaler Messdaten, wie sie
+  beispielsweise Kernspintomografen liefern.
+\end{abstract} 
+
+%\bibliographystyle{gerplain}
+\bibliographystyle{plainnat_e}
+%\bibliographystyle{jr-dinat}
+
+
+\fancypagestyle{plain}{               % change plain style, e.g. 1st page of chapter
+ \fancyhf{}                           % clear all plain header and footer fields
+ \fancyhf[RF]{Seite \thepage}
+ \fancyhf[LF]{3D--Volumendaten auf Consumer--Hardware}
+                                      % put page number on center of footer
+ \renewcommand{\footrulewidth}{0.5pt} % put a 0.5pt thick line over the footer
+ \renewcommand{\headrulewidth}{0pt}   % put no line under the header 
+}
+
+\tableofcontents
+
+\input{Einleitung}
+\input{Grundlagen}
+\input{Entwurf}
+\input{simpleGL}
+\input{wshed}
+\input{wshed_impl}
+\input{virgil}
+\input{fazit}
+
+\listoffigures
+
+\rhead{ }
+\renewcommand{\headrulewidth}{0pt}   % put no line under the header 
+\printnomenclature[2.5cm]
+
+\bibliography{ref,urls}
+
+
+\end{document}
+
+///
+Echtzeit ? nö
+vorhandene Wurzeln können beim nächsten mal wieder verwendet werden => abkürzung
+
+s/topografisch/topographisch/i - ok
+Kernspinresonanztomografen etwas lang ? ne eig nicht..
+Volumendaten kennt nich jeder - sollte jetzt ok sein (in einführung zusammen mit ``dreidimensional'' erwähnt)
+MRI erklären / ausschreiben - is doch
+Ordinaten kennt nich jeder
+API kennt nich jeder
+keine ``leeren'' Überschriften - lieber eine kleine Zusammenfassung
+Mesa oder mesa
+mesa -> eventuell technische Details etwas kürzen
+renderer ist ein Fachwort, IMMER
+
+Aufwandsberechnung prüfen
+-6.2.2 build_graph und kurz vor Wurzelsuche
+
+ordinate oder koordinate ?
+was ist ein Operator
+bei wshed am ANFANG sagen woher ich das hab
+simpleGL.tex ``Die Polygonobjekte können ihre allgemeinen Zeichenfunktionen inklusive dem Verwalten des Operationspuffers wie andere Objekte auch ausführen.'' Zeile 507
+Zoomen - is das OK ??
+Zeilenangaben in () oder []
+watershed-Verfahren oder Algorithmus
+vincent wohl doch nich komplexer (O(X)) - aussage raus
+$1$ ohne Einheit - ok ??
+nach leehren \ref{} suchen
+vista für Win ?
+cns cbs und MPI suchen - durch was Einheitliches (CBS = Max-Planck-Institut
+für Kognitions- und Neurowissenschaften) ersetzen
+new erkl? OO erkl ?
+Firmen/Produknamen lieber ins Glossar
+GPL ?
+die sache mit den Voxeln
+``Bild'' erkl
+
+%This technique is the basis of current MRI techniques. A few years later, in 1977, Raymond Damadian demonstrated MRI called field-focusing nuclear magnetic resonance. In this same year, Peter Mansfield developed the echo-planar imaging (EPI) technique.  This technique will be developed in later years to produce images at video rates (30 ms / image).
+
+
+\[
+\begin{pmatrix}
+ x_{scale} & 0 & 0 & 0 \\ 
+ 0 & y_{scale} & 0 & 0 \\ 
+ 0 & 0 & z_{scale} & 0 \\ 
+ 0 & 0 & 0 & 1
+\end{pmatrix} 
+\begin{pmatrix}
+ 1 & 0 & 0 & x_{move} \\ 
+ 0 & 1 & 0 & y_{move} \\ 
+ 0 & 0 & 1 & z_{move} \\ 
+ 0 & 0 & 0 & 1
+\end{pmatrix} 
+=
+\begin{pmatrix}
+ x_{scale} & 0 & 0 & x_{scale}*x_{move} \\ 
+ 0 & y_{scale} & 0 & y_{scale}*y_{move} \\ 
+ 0 & 0 & z_{scale} & z_{scale}*z_{move} \\ 
+ 0 & 0 & 0 & 1
+\end{pmatrix} 
+\]
+
+\[
+\begin{pmatrix}
+ 1 & 0 & 0 & -x_{move} \\ 
+ 0 & 1 & 0 & -y_{move} \\ 
+ 0 & 0 & 1 & -z_{move} \\ 
+ 0 & 0 & 0 & 1
+\end{pmatrix} 
+\begin{pmatrix}
+ \frac{1}{x_{scale}} & 0 & 0 & 0 \\ 
+ 0 & \frac{1}{y _{scale}} & 0 & 0 \\ 
+ 0 & 0 & \frac{1}{z _{scale}} & 0 \\ 
+ 0 & 0 & 0 & 1
+\end{pmatrix} 
+=
+\begin{pmatrix}
+ \frac{1}{x_{scale}} & 0 & 0 & -x_{move} \\ 
+ 0 & \frac{1}{y_{scale}} & 0 & -y_{move} \\ 
+ 0 & 0 & \frac{1}{z_{scale}} & -z_{move} \\ 
+ 0 & 0 & 0 & 1
+\end{pmatrix} 
+\]

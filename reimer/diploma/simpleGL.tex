@@ -1,0 +1,589 @@
+\chapter{Implementation der Basisbibliothek}
+
+\section{Vorbemerkungen zur Basisbibliothek}
+\label{sec:why_sgl}
+Ziel dieser Diplomarbeit ist die Entwicklung eines möglichst
+praxisnahen Visualisierungstools. Da sich in der Praxis die
+Anforderungen oft ändern, sollte dieses Programm leicht zu pflegen und
+zu erweitern sein.  
+
+Visualisierungssysteme sind naturgemäß äußerst komplex und
+umfangreich.  Das erschwert deren Pflege und jegliche nachträgliche
+Anpassungen wird zu einer potenziellen Fehlerquelle.  Jedoch fällt
+beim Betrachten der Anforderungen an solche Systeme auf, dass viele
+grundlegende Probleme und Aufgaben regelmäßig in gleicher, oder leicht
+abgewandelter Form wiederkehren.  So benötigen z.B. alle
+3D\hyp{}Visualisierungssysteme eine Kamera, Texturen und grundlegende
+geometrische Objekte wie etwa Flächen.  All diese Programme müssen
+außerdem sowohl mit dem Nutzer, als auch mit ihrer Umgebung
+interagieren.  Es ist daher sinnvoll, zuerst ein möglichst allgemeines
+Zeichensystem zu entwerfen, das diese Grundvoraussetzungen erfüllt.
+Dieses System wird in einer Basisbibliothek implementiert, und steht
+auf diese Weise darauf aufbauenden Systemen zur Verfügung.  Ausgehend
+von dieser Grundlage lassen sich dann leicht Lösungen für einen
+konkreten Fall ableiten. Die Basisbibliothek wird objektorientiert
+implementiert.  Spätere Spezialisierung sind daher problemlos über das
+Mittel der Vererbung zu erreichen. Da die Basisbibliothek die
+Grundlage dieser und zukünftiger Visualisierungsarbeiten darstellen
+und dabei möglichst breit einsetzbat sein soll, muss ihr Entwurf
+besonders gründlich und umfassend erfolgen.
+
+\subsection{Gemeinsam genutzte Ressourcen}
+\label{sec:ressharing}
+
+Im Entwurf hat sich der Bedarf nach einer effektiven Ressourcenteilung
+unter den verschiedenen Objekten gezeigt. Einerseits, um Speicherplatz
+zu sparen, und andererseits, um Änderungen an einem mehrfach verwendeten
+Objekt nicht unnötig bei dessen Kopien reproduzieren zu müssen.
+Die einfachste Methode dies zu erreichen, ist die Verwendung ein und
+des selben Speicherbereiches für mehrere Objekte.
+
+\subsubsection{Das Zeigerproblem}
+
+In den Sprachen C und C++ werden zum gleichzeitigen Verwenden des
+selben Speicherbereiches üblicherweise \fachw{Zeiger} verwendet.
+\fachw{Zeiger} speichern statt der eigentlichen Daten nur die Adresse,
+an der sich die Daten im Speicher befinden. Auf diesem Wege kann ohne
+weiteren Aufwand von jedem beliebigen Teil eines Programms aus auf die
+selben Daten zugegriffen werden. Dieses Konzept ist zwar sehr
+effektiv, da es sich an der Hardware orientiert, führt aber unter
+Umständen zu großen Problemen. Wird der Gültigkeitsbereich einer
+Variablen verlassen, wird der für sie reservierte Speicherbereich
+wieder freigegeben. Die Variable gilt damit als gelöscht. Im
+Normalfall stellt dies kein Problem dar, da die Variable per
+Definition die Einzige war, die auf diese Daten zugriff.  Da die
+Variable nicht mehr existiert, werden die gelöschten Daten garantiert
+nicht mehr benötigt. Verlässt ein Zeiger seinen Gültigkeitsbereich,
+wäre es theoretisch kein Problem den Speicherbereich auf den er
+``zeigt'' freizugeben. Zu diesem Zeitpunkt ist aber nicht bekannt, ob
+dieser Speicherbereich nicht noch von einem anderen Zeiger, oder einer
+regulären Variablen verwendet wird. Der von einem Zeiger verwendete
+Speicher kann deshalb nur von Hand freigegeben werden, wenn
+sichergestellt wurde, dass er nicht mehr verwendet wird. Es ist
+offensichtlich, dass das sehr schwierig werden kann. Gerade in
+komplexen Systemen geht die Übersicht über die Objekte im Speicher
+schnell verloren. Oft ist es für den Entwickler schlicht unmöglich zu
+garantieren, dass ein bestimmter von Zeigern verwendeter
+Speicherbereich gelöscht werden kann. Dabei kann das Freigeben noch
+verwendeten Speichers zu schweren Fehlern führen.
+
+\subsubsection{Intelligente Zeiger}
+
+Der Vorteil regulärer Variablen ist die automatische Freigabe des
+belegten Speichers bei Verlassen des Gültigkeitsbereiches. Der Vorteil
+von Zeigern liegt dagegen in der Möglichkeit einen Speicherbereich
+mehrfach zu verwenden. Diese scheinbar gegensätzlichen Eigenschaften
+vereinen intelligente Zeiger. 
+
+Intelligente Zeiger sind Objekte, die als reguläre Variable erzeugt
+werden. Wie andere Variablen werden sie bei Verlassen ihres Kontextes
+automatisch gelöscht. Den eigentlichen Zeiger halten sie als
+Parameter. Wird ein solcher intelligenter Zeiger kopiert, wird nicht
+nur der eigentliche Zeiger, also die Speicheradresse, kopiert.  Es
+wird außerdem ein interner Referenzzähler für diese Speicheradresse
+erhöht. Verlässt einer der Beiden seinen Gültigkeitsbereich, so kann
+sein Destruktor über diesen Referenzzähler leicht ermitteln, ob der
+von diesem intelligenten Zeiger verwendete Speicherbereich noch von
+Anderen intelligenten Zeigern verwendet wird. Ist dies der Fall, wird
+lediglich der Referenzzähler um eins decrementiert. Damit dieses
+System funktioniert, müssen sich die intelligenten Zeiger den
+Referenzzähler teilen. Ist der zu löschende intelligente Zeiger
+dagegen der Einzige, der diesen Speicherbereich verwendet, gibt er ihn
+frei. Zudem existieren noch einige syntaktische Mittel, welche die
+Arbeit mit intelligenten Zeigern einfacher und sicherer gestalten.
+Die für normale Zeiger in C und C++ üblichen Operatoren zur
+Dereferenzierung (\code{*} und \code{->}) können durch entsprechende
+eigene Funktionen der Klasse \fachw{intelligenter Zeiger} überladen
+werden, um die ``Dereferenzierung'' der intelligenten Zeiger zu
+vereinfachen.  Desweiteren besteht das Interface dieser Klasse aus
+zwei Konstruktoren. Der Erste erwartet einen konventionellen Zeiger
+und ihm sollte ausschließlich der Rückgabewert einer Objekterzeugung
+(\code{new}\hyp{}Operation) übergeben werden. Der zweite Konstruktor
+ist der Kopierkonstruktor. Auch er muss überladen werden, da beim
+Kopieren der Referenzzähler erhöht werden muss.  Natürlich darf nicht
+von außen auf interne Parameter des intelligenten Zeigers zugegriffen
+werden können. Die einzige Stelle des Interfaces, an der noch
+konventionelle Zeiger auftreten, ist beim Erzeugen eines neuen
+referenzierten Objektes, also dem ersten Konstruktor. Die
+\code{new}\hyp{}Operation, und damit das Erzeugen eines neuen
+Referenzierten Objektes im Speicher ließe sich auch direkt in den
+Konstruktor des intelligenten Zeigers verlagern.  Dies wird jedoch
+dadurch erschwert, dass die Parameter, die der Konstruktor des
+referenzierten Objektes erwartet, unbekannt sind.  Aus diesem Grund
+wird auf diese Möglichkeit verzichtet. Es reicht an dieser Stelle auch
+aus, einfach ``aufzupassen''. Die genannten Anforderungen, und das
+hier entworfene Verhalten basieren auf den Arbeiten von \citet{E&D-94}
+sowie \citet{Col-94}. Sie werden von dem Datentyp \code{shared\_ptr}
+umgesetzt. Diese generative Objektklasse aus den
+Boost\hyp{}Bibliotheken \citep{boost:smartptr} wird helfen im Verlauf
+dieser Arbeit ein robustes und leicht handhabbares System zur
+gemeinsamen Benutzung von Speicherbereichen zu implementieren.
+
+
+\subsection{Kommunikation}
+\label{sec:signals}
+
+Eine weitere, beim Entwurf deutlich gewordene Anforderung ist die
+Möglichkeit zur Kommunikation zwischen einzelnen Teilen des Programms.
+Darunter wird allgemein die Möglichkeit eines Programmteiles
+verstanden, unter bestimmten Umständen die Ausführung von Code in
+einem ``entfernten'' anderen Teil des Programms auszulösen. Also den
+Prozessor zu veranlassen, an die Entsprechende Stelle im Programm und
+nach Ausführung des Codes wieder zurück zu springen. Auch wenn die
+verwendete Programmiersprache C++ kein explizit dafür ausgelegtes
+Mittel kennt, gibt es unter Anderem die folgenden Möglichkeiten das
+beschriebene Verhalten mit allgemeineren Mitteln zu modellieren.
+
+\subsubsection{\fachw{Polling} gemeinsamer Variablen}
+
+Die einfachste Methode zur Kommunikation zwischen Programmteilen
+besteht darin, die zu übermittelnde Botschaft in einem gemeinsam
+verwendeten Speicherbereich abzulegen. Hat der Empfänger die Nachricht
+gelesen, löscht er sie in der Regel, um zu verhindern, dass er sie
+versehentlich doppelt liest. Das Problem dabei ist, dass eine
+Nachricht dadurch nur einmal gelesen werden kann. die Versendung an
+mehrere Empfänger ist somit ausgeschlossen.  Weiterhin können die
+potentiellen Empfänger nicht wissen, ob eine Nachricht für sie
+vorliegt. Sie müssen dies in regelmäßigen Zeitintervallen selbst
+prüfen. Dies ist meist so implementiert, dass alle potentiellen
+Empfänger von einem zentralen System regelmäßig dazu veranlasst
+werden, die Prüfung und ggf. den der Nachricht entsprechenden Code
+auszuführen. Diese als \fachw{Polling} bezeichneten Operationen kosten
+zusätzlich Prozessorzeit und verursachen auch zusätzlichen
+Verwaltungsaufwand, da eine Zentrale Verwaltungsstelle für die
+Kommunikation nötig wird.
+
+
+\subsubsection{Triggering mittels \fachw{Callbacks}}
+
+Die Programmiersprache C ermöglicht neben Zeigern auf Daten auch
+Zeiger auf Funktionen. Durch dieses System ist es beispielsweise
+möglich einer Funktion den Zeiger auf eine Nachrichtenfunktion
+mitzugeben, die diese dann nach Belieben aufrufen kann. Auf diese
+Weise kann sie bei ihrem Aufrufer ``zurückrufen''. Die dabei
+verwendeten Funktion werden deshalb auch als
+\fachw{Callback}\hyp{}Funktionen bzw. als \fachw{Callbacks}
+bezeichnet.  Übergibt ein potentieller Empfänger einem Sender eine vom
+Empfänger bestimmte Nachrichtenfunktion, kann der Sender sie nach
+Belieben aufrufen. Der Sender führt daher vom Empfänger bestimmten
+Code aus. Im Gegensatz zum \fachw{Polling} von Nachrichten bestimmt
+hier der Sender, wann der Code ausgeführt wird.  Da der Sender
+``weiß'', wann eine Nachricht vorliegt, wird nur dann Code ausgeführt,
+wenn es auch wirklich nötig ist. Unter C++ werden \fachw{Callbacks}
+oft als Objektklassen mit überladenem \code{()}-Operator realisiert.
+Dadurch verhalten sie sich syntaktisch wie Funktionen, obwohl sie im
+Sinne der Sprache Objekte sind. Aus diesem Grunde können
+\fachw{Callbacks}\hyp{}Objekte Parameter wie zum Beispiel einen Zeiger
+auf den Empfänger halten.  Obwohl \fachw{Callbacks} sehr effektiv
+sind, werden sie bei größeren Systemen selten eingesetzt, denn Zeiger
+auf Funktionen leiden unter ähnlichen Problemen wie Zeiger auf Daten.
+Die Callbackfunktionen selbst werden zwar nur äußerst selten gelöscht
+(Programmcode wird nur unter besonderen Bedingungen freigegeben), aber
+es kann nicht garantiert werden, dass der Empfänger bzw. seine Daten
+noch existieren. Die Aufrufe des \fachw{Callbacks} selbst könnten
+demnach ins ``Leere'' laufen und u. U. sogar Schutzverletzungen
+auslösen.  Das gleiche gilt für \fachw{Callback}\hyp{}Objekte wenn
+diese ihre Empfänger nicht überwachen.  Zudem muss der Sender die
+\fachw{Callback}\hyp{}Objekte verwalten. Er muss also über sämtliche
+\fachw{Callback}\hyp{}Objekt\hyp{}Klassen informiert sein und ihre
+Instanzen sinnvoll verwalten können.
+
+\subsubsection{Triggering mittels \fachw{Signal}\hyp{}\fachw{Slot}\hyp{}Architektur}
+
+Die \fachw{Signal}\hyp{}\fachw{Slot}\hyp{}Architektur stellt eine formalisierte
+Erweiterung von \fachw{Callback}\hyp{}Objekten dar. Der \fachw{Slot} ist
+dabei ein \fachw{Callback}\hyp{}Objekt mit einigen zusätzlich vereinbarten
+Eigenschaften. Er wird üblicherweise als Parameter\hyp{}Objekt des
+Empfängers implementiert, so dass er automatisch gelöscht wird, wenn
+der Empfänger gelöscht wird.  Durch einen überladenen Destruktor kann
+der \fachw{Slot} sich so bei seinem \fachw{Signal} abmelden. Das
+verhindert, dass Empfänger angesprochen werden, die nicht mehr
+existieren. Aufgebaut wird eine
+\fachw{Signal}\hyp{}\fachw{Slot}\hyp{}Verbindung indem der Empfänger seinen
+entsprechenden \fachw{Slot} bei dem \fachw{Signal}\hyp{}Objekt des Senders
+anmeldet. \fachw{Signal}\hyp{}Objekte werden ähnlich wie
+\fachw{Slot}\hyp{}Objekte in der Regel als Parameter des Senders
+implementiert, um auch hier sicherzustellen, dass der Sender sich
+gegebenenfalls bei den, mit ihm verbundenen, \fachw{Slots} abmeldet.
+Ausgelöst wird das \fachw{Signal} über den Aufruf seines überladenen
+\code{()}-Operators. Dieser ruft wiederum die \code{()}-Operatoren aller
+registrierten \fachw{Slots} auf. Diese lösen dann die gewünschten Aktionen im
+Empfänger aus. Die Vorteile diese Konzeptes liegen darin, dass
+Empfänger und Sender nichts voneinander wissen müssen, die Verbindung
+aber dennoch stabil ist. Wie bei einfachen \fachw{Callbacks} kann die
+Kommunikationsverbindung zur Laufzeit beliebig hergestellt und wieder
+getrennt werden. Dabei fungieren die \fachw{Signal}- bzw.
+\fachw{Slot}\hyp{}Objekt als standardisierte Vermittler, so dass beliebige
+Objekte ``verbunden'' werden können. Auch die Verbindung mehrerer
+Empfänger bzw. deren \fachw{Slots} mit einem \fachw{Signal} stellt kein Problem
+dar, da das \fachw{Signal}\hyp{}Objekt die ihm zugeordneten \fachw{Slots}
+in einer dynamischen Liste halten kann.
+
+\inclfigure{hbt}{classSGLObjBase_1_1CompilerMerker__coll__graph}{13cm}{Der \fachw{Slot} \code{SGLObjBase::CompilerMerker} und seine Beziehungen}{SGLObjBase::CompilerMerker:Bez}
+
+Neben der Quasi\hyp{}Standardimplementation der
+Boost\hyp{}Bibliotheken \citep{boost:signal} gehört die Umsetzung in
+der \fachw{Qt\hyp{}Bibliothek} zu den verbreitetsten
+\fachw{Signal}\hyp{}\fachw{Slot}\hyp{}Systemen für C++. \fachw{Qt}
+verwendet allerdings ein weniger formalisiertes Konzept, das auf einem
+\fachw{Precompiler}, Makros und einer zentralen Verwaltung von Sendern
+und Empfängern basiert. Außer für die Implementation der
+Nutzerschnittstelle wird in dieser Arbeit ausschließlich die
+Boost\hyp{}Implementation Anwendung finden.
+\abb{SGLObjBase::CompilerMerker:Bez} zeigt zum Beispiel die
+\fachw{Slot}\hyp{}Klasse \code{CompilerMerker}, deren einzige Instanz
+das zu \fachw{SGLObjBase} gehörende Funktionsobjekt
+\code{compileNextTime} ist.
+
+\section{Die wichtigsten Objektklassen}
+\label{sec:object}
+
+Die Basisbibliothek wird, wie im Entwurf festgelegt, objektorientiert
+implementiert. Die dabei verwendete Hierarchie und Strukturierung
+lehnt sich an die eines ``natürlichen'' Raumes an.
+
+\subsection{Die Raumklasse \fachw{SGLSpace}}
+
+
+\fachw{SGLSpace}, die Objektklasse zur Abstraktion des Raumes,
+stellt die zentrale Schnittstelle und Verwalungsinstanz des Systems
+dar. Sie erzeugt einen \fachw{OpenGL}\hyp{}Kontext, und initialisiert wenn 
+nötig den \fachw{OpenGL\hyp{}Renderer}. Sie ist ebenso für die
+Kommunikation mit den Widgetsystem zuständig. Zur Anpassung an
+verschiedene Widgetsysteme werden spezialisierte Raumklassen von der
+allgemeinen Raumklasse abgeleitet.  Diese Ableitungen sind Teil
+gesonderter Widget\hyp{}Adapter\hyp{}Bibliotheken.
+
+\inclfigure{hbt}{classSGLSpace__inherit__graph}{5cm}{Klassendiagramm für SGLSpace}{SGLSpace:Class}
+\inclfigure{hbt}{classSGLSpace__coll__graph}{15cm}{wichtige Member von SGLSpace}{SGLSpace:Bez}
+
+Sämtliche zu zeichnende Objekte müssen sich bei der entsprechenden
+Instanz der Raum\hyp{}Klasse registrieren, um in diesem ``Raum''
+gezeichnet zu werden.  Die Raumklasse speichert intelligente Zeiger
+auf diese Objekte in speziellen Listen. Neben den ``normalen''
+Objekten verwaltet jede Rauminstanz noch einige spezielle Objekte die
+es nur einmal pro Raum geben kann. Zum Beispiel eine Konsole für die
+Ausgabe von Meldungen im Grafikfenster, Koordinatengitter mit ihren
+Achsenbeschriftungen und natürlich eine Kamera. Auch die Modi des
+Renderers werden zentral in der Raumklasse verwaltet. Jegliche interne
+und externe Ereignisse werden von ihr interpretiert und die
+entsprechenden Operationen, wie zum Beispiel die Umpositionierung der
+Kamera, ausgeführt.  Bei Bedarf zeichnet sie die Szene danach komplett
+neu. Dazu wird der Renderer in den entsprechenden Modus versetzt und
+anschließend die Objektlisten aufgefordert, bei allen registrierten
+Objekten die Funktion zum Zeichnen aufzurufen.
+
+Jede Instanz der Raumklasse hat einen eigenen
+\fachw{OpenGL}\hyp{}Kontext und ein eigenes Fenster, in das dieser
+Kontex \fachw{rendert}. Die einzelnen Kontexte verschiedener Instanzen
+der Raumklasse können sich aber trotzdem Daten im \fachw{Renderer}
+teilen.  Objekte, die in einer Instanz erzeugt wurden, stehen so
+automatischen allen anderen \fachw{OpenGL}\hyp{}Kontexten zum
+Darstellen zur Verfügung. Unabhängig davon muss ein Objekt in jeder
+Instanz der Raumklasse registriert sein, in der es gezeichnet werden
+soll. Ist ein Objekt in mehreren Instanzen der Raumklasse registriert,
+können diese sich seine Daten teilen.  Auf diese Weise wird ein und
+das selbe Objekt mit den entsprechenden Transformationen der
+verschiedenen Instanzen in den verschiedemem Kontexten gezeichnet.  In
+solch einem Fall kann jede Instanz der Raumklasse als eigenständige
+Sicht auf ein und denselben Raum betrachtet werden.  Wie bereits
+erwähnt muss das Teilen der Container der Zeichenobjekte durch die
+Anwendung selbst realisiert werden, da die Kontexte sich nur
+\fachw{Renderer}\hyp{}interne Daten teilen können.
+
+
+\subsection{Die Basisklasse für Zeichenobjekte \code{SGLObj}}
+
+\code{SGLObj} ist die Basisklasse aller Container für Zeichenobjekte.
+Sie hält sämtliche allgemeine Parameter des Objektes wie
+Farbinformationen und die Transformationsmatrizen zur Positionierung
+des Objektes im Raum.  Sie stellt auch die Schnittstelle zum Zeichnen
+dieses Objektes dar, und verwaltet seinen Operationspuffer.
+
+\inclfigure{hbt}{classSGLObj__inherit__graph}{15cm}{Klassendiagramm für SGLObj}{SGLObj:Class}
+
+\inclfigure{hbt}{classSGLObj__coll__graph}{8cm}{SGLObj und ihre Beziehungen zu Anderen Klassen}{SGLObj:Bez}
+
+\subsubsection{Puffern von Zeichenoperationen in \fachw{OpenGL}}
+\label{displist}
+
+\fachw{OpenGL} ist in der Lage, sich durch API\hyp{}Aufrufe ausgelöste
+interne Operationen des \fachw{Renderers} zu merken und im
+\fachw{Renderer} zu puffern.  Muss das Objekt neu gezeichnet werden,
+entscheidet die Zeichenschnittstelle von \code{SGLObj}, ob es nötig
+ist, das Objekt mittels API\hyp{}Aufrufen komplett neu zu generieren.
+Dies wird im Folgenden als Kompilierung des Objektes bezeichnet. Hat
+sich an einem Objekt seit der letzten Kompilierung Nichts geändert,
+würde sich auch an den API\hyp{}Aufrufen zum Zeichnen Nichts im
+Vergleich zum vorherigen Aufruf dieser Zeichenfunktionen ändern. In
+solch einem Fall reicht es aus, nur den entsprechenden
+Operationspuffer aufzurufen.  Der Effekt dieses Vorgehens entspricht
+dem eines Caches für Zeichenoperationen und vereinfacht nebenbei das
+gleichzeitige Anzeigen eines Objektes in mehreren Sichten, denn die
+entsprechenden Operationspuffer liegen im \fachw{Renderer}. Sie stehen
+somit allen Kontexten gleichermaßen zur Verfügung.
+
+Tritt ein Ereignis auf, welches das Objekt möglicherweise verändert,
+muss der Operationspuffer dieses Objektes als ungültig markiert
+werden.  Gleichzeitig werden alle Sichten, in denen es angezeigt wird,
+aufgefordert neu zu zeichnen. Ruft eine solche Sicht (Instanz der
+Raumklasse) über ihre Objektliste die Zeichenfunktion dieses Objekts
+auf, kompiliert diese das Objekt neu, da sie erkennt, dass der
+Operationspuffer nicht mehr aktuell ist.  Danach markiert die
+Zeichenfunktion den Operationspuffer des Objektes wieder als gültig
+und zeichnet das Objekt. Wenn möglich, werden das Zeichnen und das
+Kompilieren zusammengefasst, im Ergebnis unterscheidet es sich aber
+nicht von der Hintereinanderausführung.
+
+\subsubsection{Operationspuffer beim Zeichnen in mehreren Sichten}
+
+Wie beschrieben, teilen sich alle Sichten sowohl interne Daten des
+\fachw{Renderers}, in diesem Fall den Operationspuffer des Objektes,
+als auch die dazugehörigen anwendungsseitigen Informationen.  Sie
+erkennen daher bei einem kürzlich kompilierten Objekt, dass der
+Operationspuffer gültig ist. Sie können das Objekt also direkt
+zeichnen, ohne es erneut kompilieren zu müssen.  In einer
+\fachw{Multithreading}\hyp{}Umgebung kann es theoretisch vorkommen,
+dass mehrere Instanzen gleichzeitig die Ungültigkeit der
+Operationspuffer feststellen. Das hat zur Folge, dass das Objekt unter
+Umständen unnötigerweise mehrfach kompiliert wird. Dies kostet zwar
+etwas Zeit, hat aber keine weiteren Folgen, da der \fachw{Renderer}
+dafür sorgt, dass der Operationspuffer auch unter diesen Umständen
+korrekt geschrieben wird.  Es lohnt es sich daher nicht, ein System zu
+implementieren, das parallele Kompilierungen verhindert.  Ein solches
+System würde selbst zusätzlich Rechenzeit beanspruchen, und wäre nicht
+zuletzt eine weitere Fehlerquelle.
+
+Die Funktion, die den Operationspuffer eines Objektes als ungültig
+markiert, ist als \fachw{Slot} implementiert
+(\code{CompilerMerker compileNextTime} zu sehen auf
+\abb{SGLObj:Class} ). Dadurch ist es möglich, den Operationspuffer
+eines Objektes mittels eines \fachw{Signals}, z. B. von einem anderen
+Objekt aus, als ungültig zu markieren. Gleichzeitig ist es auch
+möglich den \fachw{Slot} konventionell wie eine Funktion aufzurufen
+(``\code{compileNextTime()}''), da der \fachw{Slot} ein
+Funktionsobjekt ist.
+
+\subsubsection{SGLObj als abstrakte Klasse}
+
+Welche API\hyp{}Funktionen beim Zeichnen bzw. Kompilieren des Objektes in
+welcher Form aufgerufen werden, hängt davon ab, was gezeichnet werden
+soll. Die eigentliche Zeichenfunktion, die beim Kompilieren des
+Operationspuffers aufgerufen wird, ist deshalb rein virtuell
+(\code{SGLObj::generate()}). Sie wird erst durch die eigentliche
+Objektklasse implementiert.  So haben die verschieden Objekte eine
+gemeinsame Verwaltung und trotzdem volle Kontrolle über ihre
+Zeichenoperationen.  Neue Objektklassen können somit auch außerhalb
+der Basisbibliothek implementiert bzw. spezialisiert werden.
+
+
+\subsubsection{Positionierung mittels Transformationsmatrix}
+
+Neben der Schnittstelle zum Zeichnen des Objektes und zur Verwaltung
+des Operationspuffers bietet \code{SGLObj} außerdem von
+\code{SGLMatrixObj} geerbte Funktionen zur Manipulation der
+Transformationsmatrix des Objektes. In Kombination mit den Matrizen
+der Sicht bestimmen sie Lage und Skalierung des Objektes. Es stehen
+Funktionen zum Rotieren, Verschieben und Skalieren zur Verfügung.  Sie
+nehmen die entsprechenden Änderungen an der Transformationsmatrix vor.
+Bei Aufruf dieser Funktionen muss auf die Reihenfolge geachtet werden,
+da sie sich auch gegenseitig beeinflussen.  Jegliche Operationen sind
+als nicht umkehrbar definiert. Der Aufruf der Transformationsmatrix
+wird mit in den Operationspuffer aufgenommen, er wird daher bei allen
+Zeichenaufrufen von allen Sichten aus implizit zusammen mit den
+restlichen Zeichenoperationen aufgerufen. Das Objekt hat dadurch für
+alle Sichten die selbe Lage im Raum, während jede Sicht ihre eigenen
+Sichttransformationen darüberlegt. Das entspricht dem entworfenen
+Konzept von mehreren Sichten die aus unabhängigen Richtungen den
+selben Raum betrachten. Sie ``sehen'' das Objekt zwar an der gleichen
+Stelle im Raum, aber aus verschiedenen Perspektiven.
+
+\subsection{Basisklasse zur Manipulation der Sicht (\code{SGLBaseCam})}
+
+Die Instanzen der Raumklasse verwalteten ihre Sichttransformationen
+nicht selbst, sondern überlassen dies dem Kameraobjekt, das ihnen
+zugeordnet ist. Dabei bestimmt die Kamera ob und wie sie auf
+Ereignisse wie zu Beispiel einen Mausklick reagiert. 
+
+\inclfigure{hbt}{classSGLBaseCam__coll__graph}{10cm}{\code{SGLBaseCam} und ihre Beziehungen zu anderen Klassen}{SGLBaseCam:Bez}
+
+Durch das Austauschen des Kameraobjektes lässt sich somit die
+Interaktion der Sicht mit dem Anwender beeinflussen. Gleichzeitig erbt
+\code{SGLBaseCam} von \code{SGLObj}, Kameras lassen sich also auch
+zeichnen. Das wurde z.B. in den Beispielbildern der \fachw{GUI}
+genutzt, um die Lage und die Parameter der Kameras anzudeuten.
+
+
+\subsubsection{Abstraktion der Sichttransformationen}
+
+Die Lage der Kamera im Raum wird im Gegensatz zur Lage der anderen
+Objekte nicht durch ihre Transformationsmatrix bestimmt.  Wird eine
+Kamera bewegt, ändert sie nicht ihre Transformationsmatrix, sondern
+die Transformationsmatrizen der Sicht und bestimmt so zentral wie der
+Raum in der Sicht gezeichnet wird, der die Kamera zugeordnet ist.
+Wird die Kamera virtuell nach rechts bewegt, ändert dies die
+Transformationsmatrizen derart, dass alles im Raum entsprechend weiter
+links gezeichnet wird. Das gleiche gilt auch für alle anderen
+virtuellen Bewegungen der Kamera im Raum.  Die meisten dazu nötigen
+Matrixoperationen werden wieder vom \fachw{OpenGL\hyp{}Renderer}
+ausgeführt. Die \fachw{OpenGL-API} bietet Funktionen, die auf der
+Basis direkter Angaben zur Lage der Kamera und des Punktes an den sie
+``blickt'' entsprechende Änderungen an den Transformationsmatrizen der
+Sicht vornimmt. Die Kamera ist somit das einzige Objekt, dessen Lage
+im Raum nicht durch seine Transformationsmatrix, sondern durch direkte
+Koordinaten bestimmt wird.
+
+Das Zoomen kann auf mehrere Arten erfolgen. Die einfachste und
+robusteste Methode ist, die Kamera einfach näher an das betrachtete
+Objekt heran zu bewegen. Die Zoomoperation wäre damit auch nur eine
+Bewegung der Kamera. Die zweite Möglichkeit besteht in einer Verengung
+des Sichtfeldes der Kamera. Da so weniger dargestellt wird, aber die
+Größe der Anzeige selbst nicht verändert wird, erscheint das
+Angezeigte größer.  Dies ist vergleichbar mit dem Ändern der
+Brennweite einer realen Kamera.  Die Dritte Möglichkeit besteht darin,
+den Zoom als zweidimensionale Skalierung direkt auf den Anzeigepuffer
+anzuwenden.  Der Zoomfaktor ist dabei allerdings auf ganze Zahlen
+beschränkt, und darf nicht kleiner als eins sein. Diese dritte Methode
+wird in dieser Arbeit nicht zur Anwendung kommen.
+
+
+\subsubsection{Anpassung an Form und Größe des Sichfensters}
+
+Eine Änderung von Form und Größe der Anzeige hat tiefgreifende Folgen
+auf die Darstellung. Der \fachw{Renderer} muss den Anzeigepuffer
+entsprechend anpassen und auch die Kamera selbst muss unter Umständen
+einige Anpassungen vornehmen.  Die Information, über eine Änderung des
+Anzeigefensters kommt vom Widgetadapter und wird von der Raumklasse an
+die aktuelle Kamera weitergegeben.  Wie diese darauf reagiert, hängt
+von ihrem Verhaltensprofil ab.  In jeden Fall informiert sie den
+Renderer über die Änderung der Anzeige. Unternimmt sie nichts
+weiteres, muss z. B.  bei einer Verkleinerung der Anzeige das in
+seiner Größe unveränderte Sichtfeld der Kamera auf eine kleinere
+Fläche projiziert werden. Das Angezeigte wird dadurch unweigerlich
+verkleinert. Die Kamera kann diesem Effekt durch Zoomen
+entgegenwirken.  Welche der drei möglichen Methoden des Zoomens sie
+dabei anwendet hängt wiederum von ihrem Profil ab. Die dritte Methode
+steht dabei aber nicht zur Wahl, da sich mit ihr nicht stufenlos
+zoomen lässt. Für die beiden Anderen muss der Abstand der Kamera zum
+betrachteten Punkt bzw. der Winkel des Sichtfeldes bestimmt werden. Zu
+diesem Zweck werden die Eckpunkte des Fensters in den Raum projiziert.
+Dazu wird die in Abschnitt \vref{cursor:pos} beschriebene
+Positionsbestimmung angewendet, wobei die aktuelle Entfernung der
+Kamera zu dem betrachteten Punkt als Tiefeninformation fungiert.  Die
+neue Entfernung bzw. der Winkel des Sichtfeldes der Kamera lässt sich
+dann aus der Höhe dieses projizierten ``Fensters'' wie folgt
+bestimmen.
+
+\[\alpha=\arctan \left( \frac{h}{|\vec{s}|} \right)*2\]
+\[\vec{s'}=  \vec{s}* \frac{h}{\tan(\alpha/2)|\vec{s}|}\]
+
+Dabei sind \eRaum{\vec{s}} der Vektor von der Kamera zu dem
+betrachteten Punkt, \eR{h} die Höhe des projizierten Fensters und
+\eR{\alpha} der Winkel des Sichtfeldes der Kamera. Es ist zu beachten,
+dass der betrachtete Punkt in beiden Fällen gleich bleibt. Während im
+ersten Fall das Sichtfeld erweitert wird, ändert die Kamera im zweiten
+Fall ihre Position entlang der Sichtlinie. In beiden Fällen wird nur
+die Höhe, nicht die Breite des Anzeigefensters berücksichtigt.
+
+
+\subsection{Basisklassen für Flächenobjekte}
+\label{sec:SGLFlObj}
+
+\subsubsection{Allgemeine geometrische Objekte (\code{SGLFlObj})}
+
+\inclfigure{hbt}{classSGLFlObj__inherit__graph}{15cm}{Klassendiagramm für \code{SGLFlObj}}{SGLFlObj:Class}
+
+Ein Großteil der zu zeichnenden Objekte sind geometrische Objekte, die
+eine Oberfläche haben. Für sie werden beim Zeichnen weitere
+Informationen darüber benötigt, wie ihre einzelne Grenzflächen zu
+zeichnen sind. Die Informationen die das Zeichnen der Flächen direkt
+bestimmen, werden in der eigenständigen Objektklasse
+\code{SGLMaterial} gehalten. Allgemeinere Informationen, wie z.
+B., ob das betreffende Objektes überhaupt mit Oberflächen, oder
+nur als Drahtgittermodell gezeichnet werden soll, liegen im Objekt
+selbst.  
+
+\subsubsection{Polygonobjekte und Polygone (\code{SGLPolygonObj} / \code{SGLPolygon})}
+
+\inclfigures{classSGLPolygon__inherit__graph}{classSGLPolygon__coll__graph}{9cm}{Klassendiagramm
+  und Beziehungen von \code{SGLPolygon}}{SGLPolygon:Class}
+
+Eine Spezialisierung der Flächenobjekte stellen Polygonobjekte dar.
+Polygonobjekte unterscheiden sich untereinander nur in Lage und Anzahl
+der Polygone, die ihre Grenzflächen darstellen. Gezeichnet werden
+Polygonobjekte, indem alle ihre Grenzflächen gezeichnet werden. Diese
+Grenzflächen sind eingenständige Instanzen der Klasse
+\code{SGLPolygon}, die auch einzeln gezeichnet werden können. 
+
+
+Sie erben von \code{SGLObj} und können daher wie alle anderen Objekte
+unter Einbeziehung des Operationspuffers gezeichnet werden. Wie schon
+beschrieben, sind die allgemeinem Zeichnenfunktionen
+(Pufferverwaltung, Setzen globaler Parameter, Laden der
+Transformationsmatrix) und das eigentliche Zeichnen (Kompilieren) in
+gesonderten Funktionen implementiert. Die Polygonobjekte können ihre
+allgemeinen Zeichenfunktionen inklusive dem Verwalten des
+Operationspuffers wie andere Objekte auch ausführen.  Statt der
+eigentlichen Zeichnenoperation, d.h der Kompilierung rufen sie aber
+sequentiell die Kompilierung ihrer Grenzflächen\hyp{}Polygone auf. Die
+Lage des Polygonobjektes im Raum wird nur durch die
+Transformationsmatrix des Polygonobjektes selbst bestimmt. Die
+Transformationsmatrizen der Polygone werden ignoriert, da der Aufruf
+der Transformationsmatrix nicht Teil der eigentlichen Zeichenoperation
+ist.  Das ist auch sinnvoll, da sich die Lage der Grenzflächen
+einfacher und zuverlässiger durch die Bestimmung ihrer Eckpunkte
+relativ zum Mittelpunkt des Polygonobjektes festlegen lässt. Mit Hilfe
+intelligenter Zeiger können sich diese Polygone auch programmtechnisch
+Eckpunkte teilen, die sie geometrisch gemeinsam haben.  Verschiebt
+sich der Eckpunkt eines Polygons, verschieben sich damit automatisch
+auch alle Eckpunkte anliegender Polygone. Eine normalerweise
+Kommunikation zwischen den Polygonen zur ``Meldung'' der Änderung ist
+bei Polygonen innerhalb von Polygonobjekten nicht erforderlich, da das
+Polygonobjekt sie ohnehin nur als Verbund kompiliert. Bei einer
+Änderung muss daher nur das Übergeordnete Polygonobjekt ``informiert''
+werden. Diese Änderungen werden aber ohnehin in der Regel von diesem
+Objekt ausgeführt, somit erübrigt sich auch diese Kommunikation.
+
+\section{Die Widgetadapter}
+\label{sec:xxglue}
+
+Für die Basisbibliothek ist es unerheblich, welches Widgetsystem für
+das eigentliche Programm verwendet wird. Zwischen beiden existieren
+nur zwei Berührungspunkte, das Fenstermanagement und die
+Eingabebehandlung.  Das Fenstermanagement umfasst das Anlegen von
+Fenstern inklusive eines dazugehörigen \fachw{OpenGL}\hyp{}Kontextes,
+sowie den Umgang mit dieses Fenster betreffenden Ereignissen.  Zum
+Beispiel eine Änderung der Fenstergröße.  Währenddessen ist die
+Eingabebehandlung für sämtliche Eingabeereignisse, sowohl gedrückte
+Tasten, als auch Mausbewegungen zuständig.  Das Zeichnen an sich ist
+unabhängig vom verwendeten Widgetsystem, da der
+\fachw{OpenGL\hyp{}Renderer} direkt in den Anzeigepuffer, den
+\fachw{OpenGL\hyp{}Kontext} schreibt und so das Widgetsystem umgeht.
+
+Widgetadapter sind gesonderte Bibliotheken, die als Vermittler
+zwischen dem jeweiligen Widgetsystem und der Basisbiliothek dienen.
+Sie leiten die vom Widgetsystem (und damit vom der Plattform)
+kommenden Ereignisse an die entsprechenden Stellen in der
+Basisbibliothek weiter.  Implementiert werden Adapter mittels
+Ableitungen der entsprechenden Objektklassen aus der Basisbibliothek.
+Sie sind damit das erste Beispiel einer Spezialisierung aus den
+allgemeinen Klassen der Basisbibliothek.
+
+Im Rahmen dieser Arbeit werden Adapter für \fachw{QT} und \fachw{SDL}
+implementiert. Die \fachw{QT}-Bibliothek bietet ein mächtiges
+Widgetsystem, das für zahlreiche Plattformen verfügbar ist. Es hat in
+jeder Umgebung die gleiche API und reduziert so den
+Portierungsaufwand.  Im Gegensatz dazu ist \fachw{SDL} eigentlich eine
+auf Spiele spezialisierte Multimediaschnittstelle. Es ist daher kein
+Widgetsystem in eigentlichen Sinne, sondern eher mit \fachw{DirectX}
+vergleichbar.  Wie auch \fachw{Qt} ist es, im Gegensatz zu
+\fachw{DirectX}, Plattformunabhängig.  \fachw{SDL} verfügt über
+einfache Funktionen zum Anlegen und Verwalten von Fenstern, sowie über
+eine Eingabebehandlung und erfüllt damit die gestellten Anforderungen.
+
+Bei der Entwicklung der Basisbibliothek dient \fachw{SDL} als
+alternative Testumgebung, da es viel einfacher als \fachw{Qt} und
+damit leichter zu überblicken ist.  Das eigentliche
+Visualisierungstool wird jedoch ausschließlich auf \fachw{Qt}
+ausgelegt sein.
+

@@ -1,0 +1,566 @@
+\chapter{Allgemeiner Entwurf}
+\label{cha:design}
+
+\section{Auswahl der Visualisierungsmethode}
+
+Die Visualisierung der Volumendaten ist zentraler Bestandteil des zu
+entwerfenden Systems, daher spielt die Auswahl der Methode der
+Visualisierung eine entscheidende Rolle.  Im Folgenden sollen die Vor-
+und Nachteile der beiden vorgestellen Visualisierungsmethoden
+\fachw{Schnitt} und \fachw{volume rendering} betrachtet, und daraus
+die Geeignetere ermittelt werden.
+
+\subsection{Das \fachw{volume rendering}}
+\label{desing:volume}
+
+Wie bereits erwähnt, werden beim \fachw{volume rendering} die
+dreidimensional bestimmten Daten auch wieder dreidimensional
+abgebildet $\left( \mathbb{R}^3_{reel} \mapsto \mathbb{R}^3_{virt}
+\right)$. Diese ``naturgetreue'' Abbildung ist sehr intuitiv, da der
+Betrachter seine, aus der reellen Welt stammenden, Begrifflichkeiten
+und Denkweisen ohne Abstraktion übernehmen kann und sich so schnell
+``zurechtfindet''. 
+
+Es existieren zwei übliche Arten des \fachw{volume renderings}.  Beide
+werden auf Volumendaten angewendet, wobei jedem Datum ein Voxel in
+der dreidimensionalen Szene entspricht. 
+
+Das direkte \fachw{volume rendering} (DVR) wie es z.B. von
+\citet{Levoy:1990:ERT} beschrieben wird, basiert auf dem
+\fachw{Raytracing}. Der Vorteil dieses Verfahrens ist, dass es keine
+Flächen benötigt, sondern die Voxelhaufen der Szene direkt darstellen
+kann.  Es ist somit möglich transparente, oder nicht scharf
+abgegrenzte Körper natürlich darzustellen. Direktes \fachw{volume
+  rendering} ist jedoch sehr aufwendig, da prinzipiell jedes einzelne
+Datum bzw.  jeder einzelne Voxel berücksichtigt werden muss. Es gibt
+zwar Ansätze dies hardwarebeschleunigt auszuführen (
+\citet{Roettger:2003:hwdvr}), jedoch ist interaktives Arbeiten selbst
+dann nur mit extrem leistungsfähiger Hardware möglich.  Der in dieser
+Arbeit geplante breite Einsatz am Arbeitsplatz wäre derzeit nicht
+realisierbar.
+
+Ein weiterer Aspekt ist, dass sich bei diesem Verfahren, unabhängig
+vom Darstellungsmedium, immer mehrere Daten überlagern werden. Auch
+wenn verdeckte Daten (z.B. bei Transparenten Körpern) mit in die
+Darstellung einfließen findet ein Informationsverlust bzw. eine
+Verfälschung statt. Es kann nur ``in das Objekt hineingeblickt''
+werden, wenn irrelevante Daten ganz oder teilweise ausgeblendet
+werden. Wenn also die Informationen selektiv reduziert werden, und so
+der ``Blick'' auf die relevanten Daten freigeben wird.  Dazu muss
+selbstverständlich erst einmal bekannt sein, welche Daten irrelevant sind.
+Dass relevante Daten relevante Daten überlagern kann jedoch auch so
+nicht verhindert werden.
+
+Die zweite Methode, das Oberflächenrendering (SF), basiert auf einer
+binären Segmentierung des Datenraums. Für jedes Voxel wird bestimmt,
+ob es Teil des Objektes ist, oder nicht. Transparente oder diffuse
+Objekte sind nicht möglich. Auch hier findet eine selektive
+Reduzierung der Daten statt. Zwischen den auf diese Weise getrennten
+Voxelmengen wird durch den \fachw{marching cubes}-Algorithmus
+\cite{Lorensen:1987:MCH} eine Polygonfläche erzeugt. Diese Fläche
+entspricht der Oberfläche des Körpers. Sie kann konventionell, also
+auch hardwarebeschleunigt gerendert werden. In dieser Arbeit geht es
+jedoch um Daten von Messungen innerer Strukturen, während die
+Oberfläche gänzlich uninteressant ist. Auch die zweite Art des
+\fachw{volume renderings} ist daher ungeeignet.
+
+Letztendlich gibt es praktisch gesehen kein Medium für wirkliche
+dreidimensionale Darstellung.  Auch die menschliche Netzhaut, quasi
+als letzte Instanz, ist nur zweidimensional. Jegliche räumliche
+Informationen werden vom Gehirn ``interpoliert''.  Bei der üblichen
+Darstellung auf einem Bildschirm oder auf Papier gehen ohnehin
+sämtliche Tiefeninformation verloren. Eine verlustfreie direkte
+Darstellung von Volumendaten ist daher kaum möglich. Zusammenfassend
+kann gesagt werden, dass das \fachw{volume rendering} für die genannte
+Aufgabe der interaktiven Visualisierung von Volumendaten entweder zu
+langsam oder zu verlustreich ist.
+
+
+\subsection{Der \fachw{Schnitt}}
+
+Der \fachw{Schnitt} ist eine in der wissenschaftlichen Praxis bewährte
+und beliebte Methode. Er bietet auf relativ einfache Weise Einblick in
+das untersuchte Objekt. Die dabei stattfindende Reduzierung der
+sichtbaren ``Daten'' auf einen kleinen Ausschnitt kann durchaus als
+Reduktion der Informationen verstanden werden.  Anders als beim
+\fachw{volume rendering} ist diese Reduktion jedoch nicht selektiv,
+sondern unterliegt einer einfachen linearen Formel. Das ist kein
+Nachteil, da, wie bereits erörtert, die selektive Reduktion ohnehin
+nicht zweckmäßig ist.  Durch das Anfertigen mehrerer Schnitte, lassen
+sich die vorher ``aussortierten'' Daten gezielt sukzessiv ergänzen.
+Hierbei werden Überlagerungen durch die Ausschließlichkeit der Methode
+von vornherein vermieden. Elemente, die bereits Teil eines vorher
+angefertigten Schnittes sind, können nicht mehr Teil des Objektes
+sein.  Eine entsprechend geordnete Menge von Schnitten lässt sich
+leicht auch dreidimensional interpretieren, obwohl der einzelne
+Schnitt nur zweidimensionale Informationen liefert.
+
+Das Konzept des Schnittes lässt sich leicht in die Computergrafik
+übertragen, indem eine gedachte Ebene durch den Datensatz und damit
+durch das Objekt gelegt wird. Werden anschließend alle Daten
+angezeigt, die auf dieser Ebene liegen, entspricht das einem
+virtuellen \fachw{Schnitt} durch das Objekt.  Dabei kann immer nur ein
+Datum an einer bestimmten Stelle der Ebene liegen. Überlagerungen, und
+damit ein Verlust von Information bei der Darstellung werden auf diese
+Weise von vornherein ausgeschlossen. Der \fachw{Schnitt} eignet sich
+zudem besser für die Darstellung auf zweidimensionalen Medien wie
+Bildschirmen oder Papier.
+
+Der Zeichenaufwand für einen \fachw{Schnitt} ist erheblich geringer
+als beim \fachw{volume rendering}, da nur ein Bruchteil der Daten
+gezeichnet wird. Zur Bestimmung der zu zeichnenden Punkte einer Ebene
+reicht die einfache lineare Gleichung $\vec{r} = \vec{r_0} + \lambda
+\vec{u} + \mu \vec{v}$ aus.  Dabei beschreiben \eRaum{\vec{r_0}} den
+Ortsvektor eines Punktes auf der Ebene, \eRaum{\vec{u}} und
+\eRaum{\vec{v}} Vektoren auf der Ebene, und \eR{\lambda} und \eR{\mu}
+beliebige skalare Faktoren.  Sämtliche Punkte, deren Ortsvektor
+\eRaum{\vec{r}} diese Gleichung erfüllt, gehören zu der Ebene und
+müssen somit gezeichnet werden.
+
+Zwar geht auch bei diesem Verfahren die direkte Information über die
+Tiefe verloren, sie lässt sie sich aber relativ leicht ermitteln. Die
+Tiefe eines jeden angezeigten Datums entspricht genau der Tiefe seines
+Ortsvektors \eRaum{\vec{r}}, der sich wiederum leicht mittels obiger
+Gleichung bestimmen lässt.  Analog zum physischen Anfertigen mehrerer
+Schnitte, lässt sich die Schnittebene durch Anpassung der Parameter
+$\vec{r_0}$, $\vec{u}$ und $\vec{v}$ verlagern. Es lassen sich auch
+beliebig viele \fachw{Schnitte} gleichzeitig beliebig in den Datenraum
+legen.
+
+Wie bereits erwähnt, ist der Schnitt in der wissenschaftlichen Praxis
+bekannt.  Für die Zielgruppe (Mediziner) ist der \fachw{Schnitt} eine
+vertraute Darstellungsform.  Er kann deshalb innerhalb dieses Umfeldes
+als mindestens so intuitiv wie \fachw{volume rendering} angesehen
+werden und ist gleichzeitig übersichtlicher. Folglich ist der
+\fachw{Schnitt} sowohl aus ergonomischer Sicht, als auch aus Sicht der
+technischen Umsetzung besser geeignet.
+
+\section{Die Nutzerschnittstelle (\fachw{GUI})}
+\label{sec:GUI}
+
+Der Entwurf der Nutzerschnittstelle ist entscheidend für die
+praktische Anwendbarkeit und Akzeptanz eines Programms.  Dies gilt
+besonders für Visualisierungstools. Neben der bereits besprochenen
+Intuitivität und Effektivität der Visualisierung an sich, ist auch die
+Intuitivität und Effektivität des Programms in das sie eingebettet
+ist, von großer Bedeutung.
+
+\subsection{Anforderungen}
+Es sollen Schnitte aus Volumendaten dargestellt werden. Aus der Praxis
+ist bekannt, dass meist mehrere Schnitte zur Anwendung kommen. Es ist
+daher sinnvoll, mehrere Schnitte gleichzeitig darzustellen.  Daraus
+ergibt sich jedoch das Problem, dass sich mehrere Schnittebenen
+gegenseitig überlagern könnten, was wieder Informationsverlust zur
+Folge hat.  Außerdem schränkt die gleichzeitige Anzeige mehrerer
+\fachw{Schnitte} die Übersichtlichkeit stark ein. Aus diesem Grunde
+ist es notwendig, dass jeder \fachw{Schnitt} seine eigene Sicht also
+sein eigenes gesondertes Fenster hat. Diese Sichten sollen die
+Möglichkeit bieten, andere Schnitte aus- bzw.  einzublenden, was
+jedoch keinen Einfluss auf deren eigene Sicht haben darf. Eine
+zentrale Verwaltung aller Schnitte sowie ein Übersichtsfenster, das
+die Lage aller Schnitte im Raum und untereinander veranschaulicht,
+verbessert die Übersichtlichkeit zusätzlich.  Gleichzeitig muss das
+gesamte System angemessen schnell sein und möglichst geringe
+Anforderungen an die Hardware stellen, um flüssiges interaktives
+Arbeiten zu ermöglichen.
+
+\subsection{Umsetzung des Schnittkonzeptes}
+Die Schnitte selbst sind zweidimensional und können damit theoretisch
+ohne Informationsverlust (abgesehen von Rastering) auf dem Bildschirm
+abgebildet werden. Dies wird erreicht, indem die Sichtlinie, also die
+Linie an der entlang der Nutzer auf den Schnitt blickt, als Normale
+der Schnittebene verwendet wird.  Die Folge dieser Ausrichtung ist,
+dass die Schnittfläche parallel zur Projektionsfläche ausgerichtet
+wird.
+
+
+\subsubsection{Bestimmung der Schnittebene}
+\label{calc:schnitt}
+
+Die Schnittfläche wird durch Berechnung der Ortsvektoren ihrer vier
+Ecken bestimmt. Dazu sind außer der Sichtlinie noch zwei weitere
+Parameter notwendig: der Aufspannwinkel und die Sichtsenkrechte. Der
+Aufspannwinkel der Sicht ist der Winkel zwischen dem oberen und dem
+unteren Rand des Sichtfeldes. Er beträgt in der Regel ca. 30° und ist
+vergleichbar mit der Brennweite einer Kamera.  Die Sichtsenkrechte
+definiert Rollbewegungen der Sicht um die Sichtlinie. Sie zeigt aus
+Sicht des Betrachters per Definition immer senkrecht nach oben.
+Während die Rollbewegungen direkt vom Nutzer bestimmt werden, leitet
+sich der Aufspannwinkel von der Größe und Form des Sichtfensters sowie
+dem Abstand der Kamera zur Schnittfläche ab. Aus diesen drei
+Parametern lassen sich die Eckvektoren der Schnittfläche wie folgt
+berechnen:
+
+\begin{enumerate}
+  
+\item Der Sichtvektor \eRaum{\vec{s}} (steht senkrecht auf der
+  Schnittfläche und zeigt zur Kamera) hat die gleiche Richtung wie die
+  Sichtlinie, und seine Länge wird vom Nutzer indirekt als Entfernung
+  der Kamera vom Schnitt bestimmt.
+  
+\item Die direkt vom Nutzer durch Rollbewegungen der Kamera bestimmte
+  Sichtsenkrechte ist der Vektor \eRaum{\vec{u}}. Sie steht senkrecht
+  auf dem Sichtvektor.
+  
+\item Der Winkel \eR{\delta} der Diagonalen des Sichtfeldes zu seiner
+  Senkrechten wird nach der Formel $\delta=\arctan(b/h)$ berechnet.
+  Die Breite $b$ und die Höhe $h$ des Sichtfeldes sind die in das
+  Koordinatensystem des Raumes umgerechneten Maße des Sichtfensters.
+
+\item Die Länge der Hypotenuse des dabei Aufgespannten Dreiecks \eR{c}
+  ergibt sich aus $c=\frac{\sin(\alpha)}{\cos(\delta)}*|s|$, wobei
+  \eR{\alpha} der Aufspannwinkel der Sicht ist.
+  
+\item Die Eckvektoren der Schnittfläche lassen sich nun durch
+  Multiplikation der normierten Sichtsenkrechte mit $c$ und der
+  entsprechenden Rotation um die Sichtlinie ermitteln. Dies geschieht
+  nach folgender Vorschrift.
+
+\begin{center}
+$
+\vec{c}=
+\begin{pmatrix}
+\cos{(\degrees{360}-\delta)}\\ 
+\cos{(\delta)}\\ 
+\cos{(\degrees{180}-\delta)}\\ 
+\cos{(\degrees{180}+\delta)}\\
+\end{pmatrix}
+$, $
+\vec{c'}=
+\begin{pmatrix}
+1\\ 
+1\\ 
+1\\ 
+1\\
+\end{pmatrix}-\vec{c}
+$ und $
+\vec{s}=
+\begin{pmatrix}
+\sin{(\degrees{360}-\delta)}\\ 
+\sin{(\delta)}\\ 
+\sin{(\degrees{180}-\delta)}\\ 
+\sin{(\degrees{180}+\delta)}\\
+\end{pmatrix}
+$\\ 
+mit  $\vec{c} \elemof{R}{4}$, $\vec{c'} \elemof{R}{4}$ und $\vec{s} \elemof{R}{4}$ in
+\[
+\vec{e_n}=
+\begin{pmatrix}
+ s_x^2c'_n+c_n   & s_ys_xc'_n+s_zs_n & s_zs_xc'_n-s_ys_n \\ 
+ s_xs_yc'_n-s_zs_n & s_y^2c'_n+c_n   & s_zs_yc'_n-s_xs_n \\ 
+ s_xs_zc'_n+s_ys_n & s_ys_zc'_n-s_xs_n & s_z^2c'_n+c_n \\ 
+\end{pmatrix} \cdot \vec{u}
+\]
+\end{center}
+
+Dabei bestimmt \eRaum{\vec{e_n}} den Ortsvektor der n-ten Ecke der
+Schnittfläche (es gilt $0 \leq n < 4$ mit $n \elem{N}$).  Zu beachten
+ist, dass aus dem Sichtfeld nur die indirekten Größen Länge und Winkel
+der (Fenster-)Diagonalen zur Bestimmung der Diagonalen der Schnittfläche
+verwendet werden. Die Senkrechte des Sichtfensters stimmt nicht
+gezwungenermaßen mit der Sichtsenkrechten überein, sie dient nur der
+Bestimmung des Winkels $\delta$. Die Schnittfläche wird wie beschrieben
+ausschließlich durch die Rotation der Sichtsenkrechten um den
+Sichtvektor geformt. Die Werte $c$ und $\delta$ sind dabei lediglich
+Parameter, die dafür sorgen, dass Sichtfenster und Schnittfläche die
+gleiche Form haben.
+
+\end{enumerate}
+
+\abb{Sampleview1} verdeutlicht die Wirkung dieses Vorgehens. Das linke
+Bild zeigt den \fachw{Schnitt}, wie er in der Schnittsicht dargestellt
+wird.  Das rechte Bild zeigt den Überblick, der den \fachw{Schnitt}
+selbst, und seine Lage im (Daten)Raum visualisiert.
+
+\inclfigures{Overview1_2}{Overview1_1}{5cm}{Einzelner \fachw{Schnitt} mit Übersicht}{Sampleview1}
+
+Der Betrachter blickt, wie im linken Bild zu erkennen, immer senkrecht
+auf den \fachw{Schnitt} beziehungsweise der Bildschirm liegt zu jedem
+Zeitpunkt parallel zur Projektionsfläche.  Jegliche perspektivische
+Verzerrungen werden auf diese Weise vermieden. Die physische Analogie
+dazu ist eine Kamera, vor die ein Schirm montiert ist, der genau das
+Sichtfeld der Kamera abdeckt. Wird die Kamera bewegt, bewegt sich der
+Schirm mit. Die relative Lage der Kamera zum Schirm ändert sich
+daher nicht. Die Schnittebene übernimmt die Rolle des Schirms.  Wenn
+der Betrachter seine Sicht mittels Maus bewegt, bewegt er die
+Schnittebene, also den \fachw{Schnitt} durch den Raum der
+Volumendaten.
+
+Die Schnittsicht erscheint immer zweidimensional, lediglich die
+Übersicht verdeutlicht die Lage des \fachw{Schnittes} im Datenraum. Es
+findet eine strenge Trennung zwischen den quasi zweidimensionalen
+primären Informationen des \fachw{Schnittes} und seinen dreidimensionalen
+sekundären Eigenschaften, wie zum Beispiel seiner Lage, statt. Dies
+erhöht die Übersichtlichkeit, da der Anwender beim Arbeiten in der
+Schnittsicht nicht durch ``unwesentliche'' Informationen abgelenkt
+wird. Um ggf. die Lage des \fachw{Schnittes} oder andere sekundäre
+Informationen in Erfahrung zu bringen, reicht ein Blick auf das
+Übersichtsfenster.
+
+
+\subsubsection{Abbildung der Volumendaten auf dem \fachw{Schnitt}}
+
+Welches Datum aus dem Datenraum an welcher Position auf dem
+\fachw{Schnitt} gezeichnet wird, hängt von dessen Lage ab und wird
+durch die schon erwähnte Formel $\vec{r} = \vec{r_0} + \lambda \vec{u}
++ \mu \vec{v}$ bestimmt. Der \fachw{Schnitt} wird in Wirklichkeit
+nicht durch eine unendliche Schnittebene, sondern durch ein
+rechteckiges Schnittpolygon realisiert.  Die Skalierungsfaktoren
+$\lambda$ und $\mu$ der obigen Ebenengleichung sind also nicht
+beliebig. Ihre Wertebereiche werden durch die Abmessungen des Polygons
+bestimmt.  Dieses Abmessungen wiederum werden so angepasst, dass das
+Polygon die Schnittsicht genau ausfüllt.
+
+Bewegt sich der Betrachter im GL\hyp{}Raum, so ändert er nicht seine
+Sicht auf die Schnittebene, denn die bewegt sich immer entsprechend
+mit.  Stattdessen ändert er die Lage des Schnittpolygons im Datenraum,
+und damit die Parameter der obigen Formel.  Auf diesem Wege bestimmt
+er welche Daten aus dem Datenraum, d.h. dem Volumendatensatz,
+dargestellt werden. Die Berechnung ist zwar schon um einiges einfacher
+als beim \fachw{volume rendering} aber immernoch recht umfangreich.
+Sie lässt sich jedoch auf den \fachw{Renderer} übertragen, der sie
+meist effektiver bewältigen kann.
+
+\fachw{OpenGL} zeichnet Flächen polygonorientiert. Nur die Punkte des
+GL\hyp{}Raumes, die zum zu zeichnenden Polygon gehören, für die also
+obige Gleichung zutrifft, werden überhaupt beim Zeichnen
+berücksichtigt.  Wird einer dieser Punkte gezeichnet, kann die
+verwendete Farbe wie schon erklärt unter Anderem aus einem
+n-dimensionalen Puffer bestimmt werden. Es bietet sich also an, die
+dreidimensionalen Messdaten direkt in einem solchen Puffer abzulegen.
+Aus den Texturkoordinaten des zu zeichnenden Punktes \eRaum{\vec{r}}
+bestimmt der \fachw{Renderer} mittels einer einfachen Transformation
+$\menge{R} \mapsto \menge{N}$ den Index des Farbwerteintrages im
+Texturpuffer. Die Texturkoordinaten eines Punktes werden Analog zu
+seinen Raumkoordinaten über die Formel $\vec{r_tex} = \vec{r_{0_tex}}
++ \lambda \vec{u} + \mu \vec{v}$ bestimmt. Das Schnittpolygon
+existiert daher nicht nur im GL\hyp{}Raum, sondern gleichzeitig auch im
+Texturraum des \fachw{Renderers} und damit im Datenraum der in den
+Texturspeicher geladenen Messdaten. Um die Lage des Schnittpolygons im
+Texturraum zu bestimmen, werden seinen Eckpunkten zusätzlich zu den
+Raumkoordinaten Texturkoordinaten zugewiesen.  Je nach Lage des
+Schnittpolygon im Texturraum werden die Daten bzw. Farbwerte aus dem
+Daten- bzw.  Texturraum auf dem Schnittpolygon abgebildet, die es
+gerade darin ``schneidet''.
+
+Durch Gleichsetzen des Koordinatensystems des GL\hyp{}Raumes mit dem
+des Texturraumes lassen sich Texturkoordinaten ohne Transformation im
+GL\hyp{}Raum abbilden und anders herum. Es existiert daher ein virtueller
+Datenraum innerhalb des GL\hyp{}Raumes. Dieser Datenraum wird in der
+Übersicht von \abb{Sampleview1} durch den schwarzen Quader angedeutet,
+wirklich sichtbar können aber nur die Volumendaten werden, die auf
+einer Schnittebene liegen.
+
+Sämtliche angeführten Rechnungen werden vom \fachw{Renderer}, also im
+Idealfall hardwarebeschleunigt, ausgeführt. Der \fachw{Renderer}
+bestimmt die zu zeichnenden Punkte. Er ermittelt den Index der
+Farbwerte für das Zeichnen und greift direkt auf diese Werte (die
+Messwerte) im Texturspeicher zu. Nur die Raum- und Texturkoordinaten
+der Eckpunkte des Schnittes müssen von der Anwendung bestimmt werden.
+Da GL- und Texturraum gleichgesetzt sind, lassen sich die
+Raumkoordinaten auch als Texturkoordinaten werwenden. Die vier
+GL\hyp{}Raum\hyp{}Koordinaten des Schnittpolygons können wie in
+Abschnitt \vref{calc:schnitt} beschrieben, ermittelt werden.  Durch
+die Reduzierung der nötigen anwendungsseitigen Operationen auf die
+Bestimmung dieser Eckpunkte lässt sich die Darstellung des
+\fachw{Schnittes} sehr schnell und ressourcenschonend ausführen.
+
+
+\subsubsection{Mehrere Schnitte}
+
+\inclfigures{Overview2_2}{Overview2_3}{4cm}{Schnitte A und B}{Sampleview2:Schnitte}
+\inclfigure{hbt}{Overview2_1}{10cm}{Übersicht zu den zwei Schnitten A und B}{Sampleview2:Overview}
+
+\abb{Sampleview1} stellt mit zwei Fenstern nur die
+einfachste Variante der Visualisierung dar. Wie in den Anforderungen
+beschrieben, wird das System beliebig viele Schnitte gleichzeitig in
+mehreren Sichten darstellen können. \abb{Sampleview2:Schnitte} zeigt zum Beispiel die Verwendung zweier
+Schnitte. Jedem Schnitt wird dabei eine Schnittsicht zugeordnet.
+
+Die Schnitte (\abb{Sampleview2:Schnitte}) können unabhängig voneinander
+positioniert werden. Jede Schnittsicht zeigt nur ihre eigene
+Schnittebene, andere Schnitte sind ausgeblendet. Die dazugehörige
+Übersicht (\abb{Sampleview2:Overview}) zeigt dagegen beide Schnitte, ihre Lage
+zueinander, sowie ihre Lage innerhalb des Datenraumes.
+
+Aus der Verwendung mehrerer Fenster, und damit mehrerer Instanzen des
+Renderers ergibt sich zusätzlicher Verwaltungsaufwand. Die Änderung
+der Lage einer Schnittfläche muss allen Instanzen des Renderers, die
+diese Schnittebene darstellen, mitgeteilt werden. Dies betrifft
+mindestens die ihr zugeordnete Sicht und das Übersichtsfenster.
+
+Zudem müssten sich alle Instanzen die Volumendaten teilen, damit diese
+große Datenmenge nicht unnötig vervielfacht werden muss. Auch die
+Schnittfläche selbst darf bei der Anzeige in einem zusätzlichen
+Fenster möglichst nicht kopiert werden. Ihre Parameter werden bei der
+Anzeige in einer zusätzlichen Instanz nicht verändert. Eine Kopie, die
+als weitere Schnittfläche an den Renderer übermittelt werden müsste,
+wird daher eigentlich nicht benötigt. \fachw{OpenGL} bietet dazu die
+Möglichkeit, dass sich mehrere Instanzen des Renderers interne Daten
+wie Texturen und zu zeichnende Objekte untereinander teilen. Ihre
+anwendungsseitigen Container fallen aber wie alle anderen gemeinsam
+verwendeten Daten in den Verantwortungsbereich der Anwendung. In der
+Implementation müssen daher Mittel zum Teilen von Ressourcen und zur
+Kommunikation integriert werden.
+
+\subsection{Der Cursor}
+
+Als Cursor wird in der IT allgemein die Bearbeitungsposition innerhalb
+einer Menge von Daten bezeichnet. Dies gilt auch für die hier
+verwendeten Volumendaten. Der Cursor liegt naturgemäß meist im Zentrum
+der Betrachtung, und kann so effektiv besonders veränderliche
+Informationen übermitteln. Dabei sollte er aber auch nicht überladen
+werden.
+
+\subsubsection{Positionsbestimmung}
+\label{cursor:pos}
+
+Die wichtigste Information, die ein Cursor darstellt ist die der
+Position. Visualisierungssysteme verwenden meist die Position des
+Mauszeigers im Darstellungsfenster, um daraus die Position des Cursors
+zu ermitteln. Die Übertragung von Bildschirmkoordinaten ist jedoch bei
+dreidimensionalen Systemen nicht so trivial wie bei zweidimensionalen
+Systemen. Das Problem liegt dabei darin begründet, dass die bei der
+Projektion des Raumes auf den Bildschirm ($\mathbb{R}^3 \mapsto
+\mathbb{N}^2$) verloren gegangene Tiefeninformation bei der
+umgekehrten Projektion der Bildschirmkoordinaten in den Raum
+($\mathbb{N}^2 \mapsto \mathbb{R}^3$) fehlt. Aus den
+Bildschirmkoordinaten lässt sich die Raumkoordinate daher nicht
+eindeutig bestimmen, vielmehr liefert $\mathbb{N}^2 \mapsto
+\mathbb{R}^3$ einen senkrecht auf der Projektionsfläche stehenden
+Strahl von möglichen Koordinaten. \fachw{OpenGL} bietet zwar eine
+entsprechende Funktion zur umgekehrten Projektion an, dieser muss aber
+eine Tiefeninformation in der Form $z=\frac{a}{b}$ übergeben werden.
+Dabei sind $a$ der Abstand des gesuchten Punktes von der
+Projektionsebene, und $b$ der Abstand des Horizonts von der
+Projektionsebene. Die Maßzahl $z \elem{R}$ hat dabei nichts mit der
+z-Achse des Raumes zu tun, sie gibt lediglich ein Längenverhältnis an,
+und bestimmt so einen Punkt auf dem erwähnten Strahl. Für $z$ sind
+also nur Werte zwischen $0$ und $1$ sinnvoll.  Ein $z>1$ würde
+bedeuten, dass der gesuchte Punkt hinter dem Horizont liegt, und ein
+$z<0$, dass er vor der Projektionsfläche liegt.  In beiden Fällen ist
+er nicht sichtbar und damit nutzlos.  Die Bestimmung dieses
+Verhältnisses bleibt Aufgabe der Anwendung, und stellt damit das
+eigentliche Problem bei der Übertragung von Bildschirmkoordinaten in
+den Raum dar.
+
+Durch die Verwendung des Schnittkonzeptes ist die Bestimmung der
+Verhältnisszahl $z$ relativ einfach. Der Nutzer bewegt sich zwar im
+Grunde frei im Raum, jedoch bleibt er immer auf der Schnittebene. Da
+nur die auf der Schnittebene liegende Volumendaten sichtbar werden,
+sind nur die auf der Schnittebene liegende Koordinaten für den
+Anwender von Interesse. Der gesuchte Wert $a$ ($b$ ist vorgegeben)
+entspricht also genau dem Abstand der Projektionsebene am ausgewählten
+Punkt zur Schnittebene.  Auch $a$ ist weitestgehend konstant, da die
+Schnittebene, wie bereits dargelegt, parallel zur Projektionsebene
+liegt, und nur selten ihren Abstand zu dieser ändert.  Auf diese Weise
+kann auch bei dieser Operation die eigentliche Rechenlast (die
+Projektion $\mathbb{N}^2 \mapsto \mathbb{R}^3$) auf den Renderer
+übertragen werden, während die dazu nötige Verhältniszahl $z$
+weitestgehend von Konstanten abhängt, und deshalb nur selten bestimmt
+werden muss.
+
+
+\subsubsection{Darstellung}
+
+\inclfigure{hbt}{Cursor}{9cm}{Beispiel eines Cursors}{Samplecursor}
+
+Cursor werden in der Regel als Trennmarkierung zwischen einzelnen
+Dateneinheiten, oder als Markierung einer einzelnen Dateneinheit
+dargestellt. Bei Visualisierungssystemen ist der Cursor oft ein
+schlichtes Fadenkreuz.  Das hier entworfene System verwendet jedoch
+eine räumliche Darstellung, bei der weder die Betrachtungsrichtung,
+noch die Skalierung offensichtlich sind.  Es liegt daher nahe, dem
+Cursor noch zusätzlich zur Position Informationen über Lage und
+Skalierung mitzugeben. Dazu wird der Cursor als Würfel entworfen,
+dessen Kantenlänge einen bekannten Wert, z.B. eine Einheit im
+Datenraum, hat. Auf diese Weise fungiert er gleichzeitig als Maßstab,
+als Markierung des aktuell ausgewählten Datenelementes und auch als
+Abgrenzung zu den Nachbarn dieses Elementes. Wird der Würfel fest an
+den Koordinatenachsen des Raumes ausgerichtet, kann er außerdem die
+eventuelle ``Schieflage'' des betrachteten Schnittes durch seine
+eigene ``Schieflage'' (im Verhältnis zum Schnitt) andeuten.
+\abb{Samplecursor} zeigt einen solchen Cursor in der Mitte der Anzeige
+eines schief im Raum liegenden Schnittes.
+
+Die Position des Cursors im Raum, und damit auch im Datenraum) wird in
+diesem Beispiel in der Statuszeile angezeigt. Der Cursor selbst liegt
+schief und verdeutlicht so die ``Schieflage'' des Schnittes. Der
+Schnitt selbst ist stark vergrößert dargestellt, was auch durch die
+relative Größe des mit einem Millimeter Kantenlänge eigentlich sehr
+kleinen Cursors erkennbar ist.
+
+\section{Segmentierung der Volumendaten}
+
+Wie in der Zielsetzung beschrieben, soll das Visualisierungssystem die
+Möglichkeit zur interaktiven Objekterkennung bieten. Dabei sollen
+sich Anwender und Rechner gegenseitig unterstützen. Indem dem Rechner
+höhere Erkennungsaufgaben abgenommen werden, lässt sich die notwendige
+Rechenzeit reduzieren.  Außerdem wird das Erkennungssystem auf diese
+Weise flexibler. Es lässt sich somit auf eine breitere Auswahl von
+Eingabedaten anwenden und reagiert toleranter auf unerwartete Werte.
+Die, der Interaktiven Segmentierung vorangestellte automatische
+Aufbereitung besteht in einer Vorsegmentierung der Daten. Dabei sucht
+der Rechner kleinere Strukturen, die auch automatisch sicher zu
+erkennen sind, und markiert sie. Bei der, darauf folgenden
+Interaktiven Segmentierung sollen diese vorher erkannten Unterobjekte
+vom Nutzer sinnvoll zusammengesetzt werden.
+
+\subsection{Die automatische Vorsegmentierung}
+
+Für die Vorsegmentierung der Daten wird die von
+\citet{digabel-lantuejoul78} entwickelte
+\fachw{watershed}\hyp{}Transformation verwendet werden. Sie
+interpretiert zweidimensionale Bilder als zweidimensionale Graphen,
+und trennt in den daraus gebildeten Wertgebirgen die ``Senken'' und
+``Gipfel''. Soll die \fachw{watershed}\hyp{}Transformation auf
+dreidimensionale Bilder, also Volumendaten, angewendet werden, müssten
+lediglich die verwendeten zweidimensionalen Graphen durch eine dritte
+Dimension erweitert werden. Obwohl sie ursprünglich für
+zweidimensionale Bilddaten entworfen wurde, lässt sich
+\fachw{watershed}\hyp{}Transformation auf diese Weise leicht auf
+dreidimensionale Bilder übertragen. Es existiert ein große Anzahl von
+Algorithmen, die eine \fachw{watershed}\hyp{}Transformation umsetzen.
+Für diese Arbeit wurde ein rekursiver Wurzelsuchalgorithmus nach
+\citet{oai:CiteSeerPSU:114309} ausgewählt. Dieser Algorithmus bietet
+eine Kostenfunktion, die benötigt wird, wenn der Graph eine erhöhte
+Konnektivität erhalten soll. Diese Problematik wird in Kapitel
+\vref{cha:watershed_impl} ausführlich behandelt werden. Die
+Wurzelsuche lässt sich außerdem leicht parallelisieren, und kann somit
+von zukünftigen \fachw{dual-core}\hyp{}PC\hyp{}Systemen profitieren.
+Das Ergebnis dieser Transformation sind dreidimensionale Bilder, in
+denen alle Punkte, die zu einem Unterobjekt gehören, den gleichen
+Wert (Index) haben. Diese Strukturen müssen im Rahmen der folgenden
+interaktiven Segmentierung vom Nutzer zusammengefügt werden.
+
+\subsection{Visualisierung der interaktiven Segmentierung}
+
+Bei der Interaktiven Segmentierung spielt das Visualisierungssystem
+eine wichtige Rolle, denn der Nutzer muss interaktiv mitverfolgen
+können, welches Unterobjekt er gerade ausgewählt hat, wo dieses Objekt
+liegt, und wie es aussieht. Daher muss das ausgewählte Unterobjekt
+dreidimensional dargestellt werden. Der Schnitt als Primäre
+``Arbeitsfläche'' des Nutzers und Domäne des Cursors ist jedoch
+prinzipiell zweidimensional.  Das gewählte Unterobjekt ließe sich zwar
+trotzdem dreidimensional darin zeichnen, jedoch würde es einen Teil
+des Schnittes verdecken. Ein Unterobjekt wird aktiv, wenn der Cursor
+sich in ihm befindet. Folglich währe dieser zu jeden Zeitpunkt von der
+Oberfläche des aktiven Unterobjektes verdeckt. Aus diesen Gründen wird
+die Darstellung des aktiven Unterobjektes in die Übersicht
+ausgelagert. In der Schnittansicht wird das Unterobjekt dagegen
+lediglich angedeutet. Die vom Nutzer zusammengesetzten Objekte werden
+ausschließlich in der Übersicht dargestellt.
+
+Diese Visualisierung der Segmentierung muss ausreichend schnell
+erfolgen, um flüssiges Arbeiten zu ermöglichen.  Aufgrund der
+Vorbereitung der Daten durch die Vorsegmentierung muss der Rechner
+während der eigentlichen Segmentierung nur noch das vom Nutzer
+ausgewählte Unterobjekt aus dem Ergebnisspool der Vorsegmentierung
+auswählen und darstellen. Werden die Darstellungen der Unterobjekte
+gepuffert (die Unterobjekte ändern sich nie), lässt sich die
+Visualisierung der Segmentierung lässt sich daher problemlos mit der
+geforderten Geschwindigkeit umsetzen. Dessenungeachtet ist auch hier
+ein effektives System für den Datenaustausch zwischen den Sichten
+notwendig ist.
+
+

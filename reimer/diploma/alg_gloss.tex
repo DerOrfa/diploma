@@ -1,0 +1,149 @@
+\nomenclature{GL-Raum}{virtueller, durch eine \fachw{OpenGL}-Sicht
+  dargestellter Raum, in den zu zeichnende Objekte platziert werden.
+  Der GL-Raum ist theoretisch unendlich, es wird jedoch nur ein, durch
+  die Sicht definierter Teil, gezeichnet. }
+
+\nomenclature{Texturraum}{virtueller Raum innerhalb des GL-Raumes, der
+  durch eine dreidimensionale Textur geformt wird. Hier auch
+  vereinfachend als Datenraum bezeichnet.}
+
+\nomenclature{GUI}{``graphical user interface'' bzw. ``Grafische Benutzungsschnittstelle''\\
+  System das grafisch mit dem Nutzer über Fenster, Schaltflächen,
+  Dialogboxen u.Ä. interagiert. Wird allgemein als intuitiver als die
+  Interaktion mittels Kommandos angesehen. }
+
+
+\nomenclature{Kontext}{Hier meist \fachw{OpenGL}-Kontext.\\
+  Identifiziert eine Instanz des \fachw{OpenGL}-Renderers. Der Kontext
+  ist fest mit reservierten Ressourcen des Systems, sowie dem Fenster
+  in das der Renderer zeichnet, verbunden.}
+
+
+
+\nomenclature{Widget}{Kurzform von ``Window Gadget''\\
+  Frei übersetzt: ``Dingsbums für Fenster''.  Bezeichnet in der
+  Programmierung allgemein Funktionen oder Objekte, die zum Darstellen
+  in Grafischen Nutzerschnittstellen verwendet werden.}
+
+%\nomenclature{WM}{Window Manager bzw. Fenstermanager\\
+%System, das die Darstellung der Fenster einer Grafischen
+%Nutzerschnittstelle beeinflusst und die Eingabegeräte (Tastatur, Maus
+%usw.) dem jeweils aktiven Fenster zuordnet. Sowohl der äußere Rahmen
+%als auch die Position der primärer Fenster werden vom WM kontrolliert.}
+
+\nomenclature{voxel}{Kurzform für Volumenpixel\\
+  Dreidimensionale Version des Pixels. Ein Voxel repräsentiert ein
+  Datum in einem Volumendatensatz. Voxel sind hier nicht
+  gezwungenermaßen kubisch. }
+
+\nomenclature{CBS}{Max-Planck-Institut für Kognitions- und
+Neurowissenschaften\\
+(engl.: Max Planck Institute for Human Cognitive and Brain Sciences ) }
+
+
+\nomenclature{vista}{Die Vista Bibliothek\\
+  Eine Funktionsbibliothek für die wissenschaftliche Arbeit mit
+  graphischen Daten im weitesten Sinne. Im CBS vor allem für den
+  Datenaustausch verwendet. (siehe auch Abschnitt \vref{sec:volumetex}
+  und Quellenverweis \cite{vista})}
+
+
+\nomenclature{mesa}{auch Mesa3D\\
+  Vor allem im UNIX-Bereich verbreiteter \fachw{Softwarerenderer} mit
+  modularer Architektur. (siehe auch Abschnitt \vref{def:renderer} und
+  Quellenverweis \cite{mesa}) }
+
+\nomenclature{OpenGL}{Open Graphics Library\\
+  Ursprünglich von \cite{sgi} als IrisGL entwickelte
+  Softwareschnittstelle für Vektorgrafik. Inzwischen als OpenGL
+  standardisiert.\\
+  (siehe auch Kapitel \vref{opengl})}
+
+\nomenclature{API}{Application Programming Interface\\
+  Die Schnittstelle, die ein Softwaresystem anderen Programmen zur
+  Verfügung stellt.}
+
+\nomenclature{ARB}{Architecture Review Board\\
+  Hier das Standardisierungsgremium des \fachw{OpenGL}\hyp{}Standards. \\
+  (siehe auch Kapitel \vref{opengl})}
+
+\nomenclature{DVR}{direct volume rendering\\
+  Renderingmethode bei der Volumendaten direkt mittels
+  \fachw{Raytracing} abgebildet werden.  (siehe auch Abschnitt
+  \vref{desing:volume}) } 
+
+\nomenclature{SF}{``surface fitting'' bzw.
+  Oberflächenrendering\\
+  Renderingmethode bei der Volumendaten indirekt mittels
+  Polygonisierung dargestellt werden.  (siehe auch Abschnitt
+  \vref{desing:volume})}
+
+\nomenclature{Raytracing}{auch Strahlverfolgung\\
+  Ein Rendering-Verfahren zur Erzeugung meist fotorealistisch
+  wirkender Bilder. Für jedes Pixel der Zielbildes wird mindestens ein
+  Strahl in die Szene gesandt. Die ``Bedingungen'', die der Strahl
+  dort ``vorfindet'' bestimmen die Farbe des Zielpixels.}
+
+\nomenclature{MRI}{Magnetresonanztomografie, auch
+  Kernspintomografie oder Kernspin\\
+  Ein bildgebendes Verfahren zur Darstellung von Strukturen im Inneren
+  des Körpers, das auf dem magnetischen Moment von Atomkernen beruht.\\
+  (siehe auch Abschnitt \vref{MRI}) }
+
+\nomenclature{fMRI}{funktionelle Magnetresonanztomografie
+  oder Kernspintomografie\\
+  kernspintomografisches Verfahren das unter Verwendung des
+  BOLD\hyp{}Verfahrens über die Sauerstoffanreicherung Rückschlüsse auf die
+  Aktivität des entsprechenden Gebietes zieht.\\ (siehe auch Abschnitt
+  \vref{MRI}) }
+
+\nomenclature{BOLD}{Blood Oxygen Level Dependency\\
+  Von \citet{Ogawa:bold} entwickeltes kernspintomografisches Verfahren,
+  das die 1935 von Linus Pauling und Charles D. Coryell entdeckte
+  paramagnetische Eigenschaft von Hämoglobin ausnutzt, um die
+  Sauerstoffanreicherung im Blut zum messen.\\ (siehe auch Abschnitt
+  \vref{MRI}) } 
+
+\nomenclature{Renderer}{vom englischen ``to render''
+  d.h. ``machen''\\
+  Hier ist damit die Generierung von Pixelbildern aus abstrakten
+  Eingabedaten gemeint. Als \fachw{Renderer} werden Systeme
+  bezeichnet, diese Funktion ausführen. }
+
+\nomenclature{rastern}{Abbilden beliebiger Bilddaten in
+  diskreten Puffern\\
+  Bezeichnet eine Operation, die meist stetige zweidimensionale Bilder
+  in zweidimensionale Pixelpuffer (z.B. Bildpuffer einer Grafikkarte)
+  abbildet, in diesem Fall ist $f:\menge{R}^2 \mapsto \menge{N}^2$.\\
+  (siehe auch Abschnitt \vref{opengl:arch}) }
+
+\nomenclature{MRT}{Magnetresonanztomografie\\
+  (siehe auch MRI)}
+
+\nomenclature{overhead}{Daten, die nicht primär zu den Nutzdaten
+  zählen, sondern als Hilfsdaten zur Übermittlung oder Speicherung
+  benötigt werden.}
+
+\nomenclature{dual-core}{Prozessoren mit zwei Rechenwerken\\
+Dual-Core-Prozessoren werden von vielen Herstellern als Weg gesehen,
+die Leistung von Desktopsystemen ohne Erhöhung der Taktrate zu
+steigern. Sowohl AMD, als auch Intel haben Dual-Core-Prozessoren angekündigt oder  bereits
+ im Angebot.}
+
+\nomenclature{GPU}{Graphic Processing Unit oder Visual Processing Unit (VPU)\\
+Prozessor, der auf graphische Operationen wie
+z.B. \fachw{OpenGL}\hyp{}Operationen spezialisiert ist. 
+(siehe auch Abschnitt \vref{opengl})
+}
+
+\nomenclature{Direct3D}{3D-Modul von DirectX\\
+\fachw{OpenGL} nachempfundene, aber objektorientierte Schnittstelle
+für die Programmierung dreidimensionaler Systeme. Stark an MS-Windows
+gebunden, und daher nur dort verfügbar.
+}
+
+\nomenclature{Qt}{``The Qt application development framework'' \\
+Eine umfangreiche und sehr mächtige Systembibliothek mit
+Widgetsystem, die für zahlreiche Plattformen verfügbar ist. 
+Die API ist plattformunabhängig.
+}

@@ -1,0 +1,94 @@
+
+\chapter{Zusammenfassung}
+
+\section{Fazit der Arbeit}
+
+Im Rahmen dieser Arbeit wurde ein offenes und schlankes System zur
+Visualisierung dreidimensionaler Daten entworfen und entwickelt.  Im
+Entwurf wurden einfache und effiziente Lösungen gesucht und gefunden.
+Dabei lag die Priorität primär auf der praktischen Anwendbarkeit im
+Wissenschaftlichen Umfeld, und sekundär auf der Flexibilität der
+Anwendung. Das System wurde von Grund auf Modular entworfen. Ein
+Basismodul, die \fachw{simpleGL}-Bibliothek, spielt in diesem Entwurf
+eine zentrale Rolle. Die \fachw{qt\_glue}-Bibliothek entkoppelt als
+kleinstes Modul das Hauptmodul von der, für die Nutzerschnittstelle
+verwendeten \fachw{Qt}-Bibliothek. Die Nutzerschnittstelle greift als
+viertes Modul auf das Basismodul und auf das vierte Modul, die
+\fachw{watershed}\hyp{}Transformation zurück. Sie bildet auf diese
+Weise die eigentliche Applikation. Weitere Module zur Erfüllung
+weiterer Aufgaben können diesem Verbund jederzeit hinzugefügt werden.
+
+Der modulare Entwurf wurde konsequent objektorientiert umgesetzt.
+Während der Implementierung wurde großer Wert auf
+Wartbarkeit,Erweiterbarkeit und Wiederverwendbarkeit des Codes gelegt.
+Fehleranfällige Mittel der Programmierung, wie z.B. Zeiger wurden
+bewusst vermieden und durch moderne robustere Alternativen ersetzt.
+Lediglich während der Implementierung der
+\fachw{watershed}\hyp{}Transformation wurden ``traditionelle'' Mittel
+bevorzugt, um die dort nötige Speichereffizienz zu erreichen.
+
+\section{Empfehlungen zur verwendeten Plattform}
+
+Das Visualisierungssystem wurde hauptsächlich unter Debian-Linux
+entwickelt. Seine Portabilität wurde durch die Verwendung portabler
+Bibliotheken und den weitgehenden Verzicht auf hardwarenahe
+Programmierung erhalten. Es sollte daher ggf. nach geringem
+Portierungsaufwand allen üblichen UNIX\hyp{}Desktop\hyp{}Systemen
+lauffähig sein. Auch eine Portierung nach Windows wäre theoretisch
+möglich, scheitert aber unter Umständen an Lizenzkosten für \fachw{QT}
+und der \fachw{vista}\hyp{}Bibliothek, die nicht für Windows verfügbar
+ist.
+
+Eine Ausname der allgemeinen Verfügbarkeit auf üblichen Plattformen
+bilden in diesem Zusammenhang Rechner ohne kompatiblen
+\fachw{OpenGL}\hyp{}Renderer. Das Visualisierungssystem kann zwar auf
+Softwarerenderern wie z.B. Mesa \cite{mesa} betrieben werden, hier
+treten jedoch oft Probleme mit dem Grafikspeicher auf. Die Verlagerung
+der Volumendaten in den Speicher des Renderers entlasten auf Rechnern
+mit separatem Grafikspeicher die CPU und den Systemspeicher. Jedoch
+sind Systeme ohne echten Grafikspeicher (shared memory) aus diesem
+Grund nur eingeschränkt nutzbar, da hier der Grafikspeicher
+physikalisch im Systemspeicher liegt. Dieser ist für die Lagerung
+dreidimensionaler Texturen nicht geeignet. Ein Einsatz des entwickelten
+Visualisierungssystems auf Rechnern, bei denen die Grafikkarte
+lediglich als Chip auf dem \fachw{Mainboard} realisiert ist, ist daher
+zwar möglich, aber nicht empfehlenswert. Einfache 3D-Grafikkarten mit
+ausreichendem eigenen Speicher und \fachw{OpenGL}\hyp{}kompatiblen
+Grafikprozessoren (GPUs) wie z.B. ``ATI Radeon 9200'', oder ``nVidia
+GeForce2'' sind sind dagegen vollkommen ausreichend. Besonders
+empfehlenswert sind GPUs nach Version $2.0$ des
+\fachw{OpenGL}-Standards, denn dieser lässt einen effektiveren Umgang
+mit dem Texturspeicher zu. Der verfügbare Grafikspeicher sollte jedoch
+in jedem Fall groß genug sein, um die Volumendaten aufnehmen zu
+können. Für die am CBS üblichen MRT-Aufnahmen reicht ein
+Grafikspeicher von $32$ MByte.
+
+Verfügt das System wie empfohlen über separaten Grafikspeicher,
+reichen für die Visualisierung inklusive Segmentierung $128$ MByte
+Systemspeicher. An die Festplatte werden keine besonderen
+Anforderungen gestellt. Ein großzügig bemessener Bildschirm ist jedoch
+von Vorteil. 
+
+Da \fachw{OpenGL} ein Client\hyp{}Server\hyp{}System ist, steht auch
+einer Anwendung auf einem Terminal\hyp{}Server nichts im Wege, solange
+die Grafikkarten der Terminals die Anforderungen erfüllen. Dabei
+sollte jedoch beachtet werden, dass die Volumendaten beim Laden von
+der Anwendung (in diesem Fall auf dem Terminal\hyp{}Server) zum
+Renderer (die Grafikkarte im Terminal) übertragen werden müssen. Daher
+wird eine ausreichend leistungsfähige Netzwerkverbindung benötigt.
+
+\section{Fortführende Überlegungen}
+
+Das im Rahmen dieser Arbeit entwickelte eigentliche Visualisierungssystem
+(virgil) konnte dank der Auslagerung der meisten Funktionen in die
+entsprechenden Module einfach gehalten werden. Daher bleibt der
+Quellcode sehr übersichtlich. Zukünftige Korrekturen, Anpassungen oder
+Erweiterungen lassen sich somit leicht realisieren. Die parallel
+entwickelte Basisbibliothek weist außer \fachw{OpenGL} keine weiteren
+Abhängigkeiten auf. Ihr Funktionsumfang deckt ein weites Spektrum von
+Visualisierungsaufgaben ab. Ihre Wiederverwendbarkeit auch außerhalb
+des aktuellen Rahmens ist daher ausgesprochen hoch.
+
+Eine weitere Entwicklung sowohl des Basismoduls, als auch des
+Visualisierungssystems wird daher empfohlen.
+

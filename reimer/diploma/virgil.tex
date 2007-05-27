@@ -1,0 +1,224 @@
+\chapter{Implementierung des Visualisierungstools}
+\label{cha:virgil}
+
+Bei der Implementierung des eigentlichen Visualisierungstools wird auf
+die Basisbibliothek, den \fachw{QT}\hyp{}Widgetadapter sowie die, an
+die Anwendung auf Volumendaten angepassten Implementierungen der
+\fachw{watershed}\hyp{}Transformation zurückgegriffen.  Die grafische
+Schnittstelle basiert, wie bereits erklärt auf \fachw{QT} und die für das
+Programm verwendeten Daten liegen im \fachw{vista}\hyp{}Format vor.
+Zum Lesen und Schreiben dieser Daten greift das Programm daher auf die
+Funktionen der frei verfügbaren \fachw{vista}\hyp{}Bibliothek
+\cite{vista} zurück.
+
+\section{Handhabung der Volumendaten}
+\label{sec:volumetex}
+
+Das \fachw{vista}\hyp{}Format organisiert grafische Daten als
+sequentielle Datensätze beliebiger Anzahl in Blöcken innerhalb einer
+\fachw{vista}\hyp{}Datei. Jeder Eintrag eines solchen Blockes entspricht
+dabei einem Voxel des Datenraumes und damit einem Messpunkt im reellen
+Raum. Die Kantenlängen des gemessenen Quaders sowie die Kantenlängen
+der einzelnen Voxel sind in zusätzlichen Informationsfeldern innerhalb
+der entsprechenden Blockes gespeichert.
+
+Gelesen werden diese Daten direkt von einer Instanz der Klasse
+\code{GLvlVolumeTex}. Wie \abb{GLvlVolumeTex:Bez} zeigt, ist
+\code{GLvlVolumeTex} abgeleitet von \code{SGLBaseTex}, der Basisklasse
+für Texturcontainer aus der Basisbibliothek.
+\inclfigure{hbt}{classGLvlVolumeTex__coll__graph}{10cm}{\code{GLvlVolumeTex} und ihre Beziehungen}{GLvlVolumeTex:Bez}
+
+Von \code{SGLBaseTex} erbt \code{GLvlVolumeTex} die nötigen Methoden
+zur Verwaltung von \fachw{OpenGL}\hyp{}Texturen. Das Laden der
+Volumendaten erfolgt durch die \fachw{vista}\hyp{}Laderoutinen.\\
+\code{GLvlVolumeTex} lädt beim Erzeugen einer Instanz der ihr
+übergeben Datei den Datensatz, der die gemessenen anatomischen Daten
+enthält. Zusätzlich zu diesen hoch aufgelösten Daten der
+Gewebestrukturen eines kompletten Gehirns, liegen den
+\fachw{vista}\hyp{}Dateien meist noch funktionelle Daten bei. Diese
+Informationen über die Aktivitäten bestimmter Bereiche des selben
+Gehirns über eine bestimmte Zeitspanne hinweg liegen in einer
+geringeren Auflösung vor und umfassen meist auch nur einen Ausschnitt
+des Gehirns. Sie werden später unter Verwendung von
+\fachw{Multitexturing} beim Zeichnen der Schnittfläche ``über'' die
+Anatomischen Daten geblendet.
+
+Die Volumendaten können in verschieden Datentypen vorliegen. \code{GLvlVolumeTex} 
+muss dem Rechnung tragen und die jeweils optimale Laderoutine anwenden.  
+Während anatomische Daten aus ganzzahligen
+Werten bestehen, sind funktionelle Daten in der Regel
+Fließkommazahlen. So werden anatomische Daten, die als Grauwerte
+zwischen $0$ und $255$ vorliegen, als Indexwerte einer vorgegeben
+Farbpalette geladen. Die Fließkommazahlen, welche die Aktivitäten im
+funktionellen Datensatz repräsentieren, lassen sich schlechter einem
+bestimmten Index zuweisen. Sie werden deshalb als Parameter einer
+vorgegebenen Funktion verwendet, die an den entsprechenden Stellen in
+der \fachw{OpenGL}\hyp{}Textur Echtfarben zuweist.
+
+
+Da die spätere Schnittfläche beliebig im Datenraum platziert werden
+kann, wird sie dort unter Umständen auch herausragen. In einem solchen
+Fall muss der Renderer beim Zeichnen der Textur auf die Schnittfläche
+ein definiertes Verhalten zeigen. Der Renderer wird deshalb so
+konfiguriert, dass er beim Zeichnen eines Pixels zu dem die
+Texturinformationen fehlen, die Informationen des am nächsten
+liegenden verfügbaren Voxels der Textur anwendet. Der Rand der Textur
+wird dadurch bei einer herausragenden Schnittfläche unendlich oft
+wiederholt. Aus diesem Grunde ist die Textur an allen Seiten um
+mindestens einen Voxel größer der entsprechende Datensatz. Dieser
+Voxel hat im Alpha\hyp{}Kanal den Wert $0$. Der \fachw{Renderer} ist
+dabei so konfiguriert, daß er derartige Punkte nicht zeichnet.
+
+Einfache \fachw{OpenGL}\hyp{}Renderer können nur Texturen verarbeiten,
+deren Länge $2^n$ mit $n=\{1,2,3,\pp\}$ entspricht. Deshalb kann die
+Größe der Textur nur eingeschränkt an die Größe der vorliegenden Daten
+angepasst werden. Die Daten werden stattdessen in eine Textur mit der
+nächstgrößeren Potenz von zwei gelegt. Wie schon erwähnt wird jeweils
+an einer Seite ein Voxel ausgespart, während auf der Gegenseite alle
+übrigen Voxel leer bleiben. Liegen Daten mit der Kantenlänge 500 vor,
+wird eine Textur der Kantenlänge $2^9=512$ angelegt. Daraus folgt,
+dass die eigentlichen Daten darin erst bei $1$ beginnen und bei $501$
+enden. Die übrigen Voxel ($0$ und $501-511$) werden mit leeren
+Einträgen ($Alpha \leftarrow 0$) aufgefüllt. Diese Spezifikationen
+werden auf alle drei Dimensionen angewandt.
+
+Die Einträge $1$ bis $255$ der Farbpalette für die anatomischen Daten
+werden mit grauen RGBA\hyp{}Werten
+(${(1,1,1,255),\pp,(255,255,255,255)}$ gefüllt. Die eigentliche Textur
+braucht daher wie bereits erwähnt aus nur $8$ Bit großen Indexen
+bestehen, deren Werte $1-255$ in dem entsprechenden Grauwert
+dargestellt werden. Der ersten Eintrag der Farbpalette ($(0,0,0,0)$)
+ist ein Sonderfall, sein Alpha\hyp{}Wert (vierter Wert) ist Null.
+Voxel mit dem Index $0$ werden daher beim Zeichnen den Alpha\hyp{}Wert
+$0$ ergeben. Sie werden somit nicht gezeichnet. Auf diese Weise können
+Voxel, die nicht gezeichnet werden sollen, markiert werden, ohne ein
+zusätzliches Bit dafür zu benötigen. Im Datensatz kommt der Wert $0$
+nur im ``Hintergrund'' vor, und dieser soll ohnehin nicht gezeichnet
+werden. Die anatomischen Daten stellen den mit Abstand größten
+Datensatz dar, diese Konzepte sparen Speicher bei der Ablage der Daten
+im Texturspeicher des Renderers.
+
+\section{Umsetzung der Nutzerschnittstelle}
+\label{sec:cutview}
+
+Die Nutzerschnittstelle des Programms besteht aus einer Anzahl
+Fenstern mit jeweils einer \fachw{OpenGL}\hyp{}Instanz. Nach dem Start ist
+nur das Fenster mit der Übersicht vorhanden. Es zeigt zu diesem
+Zeitpunkt einen leeren Raum, denn es sind noch keine Schnitte
+angelegt. Für jeden neuen Schnitt wird ein weiteres Fenster mit einer
+Schnittansicht geöffnet. Diese Schnitte verhalten sich wie im Entwurf
+konzipiert. Wechselt der Nutzer zu einem Schnittfenster, kann er mit
+Hilfe der Maus die Lage des Schnittes verändern und der Cursor zeigt
+die in den Raum projizierte Position seiner Maus an. Im
+Übersichtsfenster wird gleichzeitig die Lage des Schnittes im Raum
+verdeutlicht und es lassen sich beliebig viele weitere Schnitte
+erzeugen.
+
+Alle Schnittfenster, sowie das Übersichtsfenster teilen sich, wie im
+Entwurf vereinbart, sowohl \fachw{Renderer}interne Daten als auch die
+dazugehörigen programmseitigen Parameter.  Um das System nicht unnötig
+zu belasten, wird jede Anzeige nur dann aktualisiert, wenn dies
+wirklich nötig ist. Es ist deshalb notwendig, dass ein Schnitt, der
+seine Lage ändert, dies selbstständig dem Übersichtsfenster mittels
+\fachw{Signal}\hyp{}\fachw{Slot}\hyp{}System mitteilt, damit dieses
+weiß, dass es neu zeichnen muss.
+
+\section{Darstellung der Volumendaten auf der Schnittfläche}
+\label{sec:cutplane}
+
+Die Klasse für die eigentliche Schnittfläche \code{GLvlCutPlane} ist
+(über Zwischenschritte) von \code{SGLPolygon} aus der Basisklasse
+abgeleitet. Damit ist \code{GLvlCutPlane} ein schlichtes Viereck mit
+einer Instanz der Klasse \code{GLvlVolumeTex} als Textur. Diese Textur
+teilt sich die Schnittfläche mit Hilfe intelligenter Zeiger mit allen
+anderen Schnittflächen, da sie alle die selben Volumendaten darstellen
+sollen. Ihre Eckpunkte teilt sich die Schnittfläche mit der Kamera
+ihrer Schnittansicht. Jede Schnittansicht hat eine eigene Instanz der
+Klasse \code{GLvlPlaneCam}, einer Spezialisierung der Basisklasse
+\code{SGLBaseCam}. Diese Kamera bestimmt bei jeder Verlagerung alle
+vier Eckpunkte ihres Blickfeldes entsprechend den Beschreibungen aus
+Abschnitt 4.2.3 neu. Diese Eckpunkte teilt sie sich mit der
+Schnittfläche. Die Schnittfläche und die Projektionsfläche der Sicht
+sind damit identisch. Ändert sich ein Parameter der Kamera ändern sich
+auch die Eckpunkte der Schnittfläche. Lediglich die Mittelung über
+diese Änderung muss explitzit per \code{compileNextTime} an die
+Schnittfläche gesandt werden, damit sie beim nächsten Neuzeichnen neu
+kompiliert wird.
+
+Die Lage der Schnittfläche im eigentlichen Raum ist damit bestimmt,
+ihre Lage im Datenraum fehlt aber noch. Auch hierfür müssen die
+Koordinaten der Eckpunkte bestimmt werden. Um deren Bestimmung
+möglichst einfach zu gestalten, benutzen der eigentliche Raum und der
+Datenraum ein identisches Koordinatensystem.  Die Texturkoordinaten
+können daher fast direkt aus den Raumkoordinaten der Schnittfläche
+übernommen werden. Dabei ist jedoch zu beachten, dass die leeren Voxel
+an den Rändern der Textur im Renderer nicht gezeichnet werden. Da sie
+dennoch Teil des Texturraumes sind, ist der Datenraum eigentlich als
+eine Untermenge des Texturraumes zu betrachten. Die Texturkoordinaten
+der Schnittfläche werden beim Zeichnen auf den Texturraum und nicht
+auf den Datenraum angewendet.  Sie müssen daher entsprechend angepasst
+werden, um den Texturraum im Verhältnis zu der Schnittfläche so zu
+verschieben und zu skalieren, dass die Differenz zwischen Datenraum
+und Texturraum ausgeglichen wird.
+
+\section{Der Cursor}
+\label{sec:cursor}
+
+Der für den Cursor verwendete Objektklasse \code{GLvlPlaneCursor} ist
+von der Basisklasse \code{SGLMetaObj} abgeleitet. Sie vereint eine
+beliebige Anzahl von Instanzen der Basisklasse \code{SGLCube} in sich.
+Der Cursor besteht daher aus einer beliebigen Anzahl von Würfeln, die
+entsprechend Würfelförmig angeordnet werden. Die einzelnen Würfel
+haben eine Kantenlänge von $1$ und werden als Drahtgittermodelle
+gezeichnet. Ihre Anzahl wird von Nutzer bestimmt, der auf diese Weise
+die Größe des Cursors anpassen kann. Dabei verdeutlichen die Einzelnen
+Würfel jederzeit den Maßstab. Die Position des Cursors im GL-Raum wird
+wie in Abschnitt \vref{cursor:pos} beschrieben, aus der Position des
+Mauszeigers ermittelt. Seine Koordinaten können dabei auf ganzzahlige
+Werte gerundet werden. Dieser ``Fang'' kann vom Nutzer aktiviert bzw.
+deaktiviert werden. Obwohl der Cursor den Mauszeiger prinzipiell
+ersetzt, wird dieser nicht ausgeblendet, denn vor allem bei
+aktiviertem Fang verwirrt ein fehlender Mauszeiger mehr als er nützt.
+
+
+\section{Integration der \fachw{watershed}\hyp{}Transformation}
+
+Die in Kapitel \vref{cha:watershed_impl} beschriebenen
+Implementationen der \fachw{watershed}\hyp{}Transformation liefern
+Bilder $f_{wshed}:\menge{N}^3 \mapsto \menge{N}$ die die Gruppierung
+der Punkte nach ihrere zugehörigkeit zu lokalen Minima beschreiben.
+Für jeden Punkt $p$ liefert $f_{wshed}(p)$ den Index des Minimas, dem
+er angehört.  Die Visualisierung dieser Unterteilung wird in
+Kobination mit dem Cursor mittels Polygonen realisisiert. Jeder Punkt
+$p$, der einen Nachbar $q \in N_G(p)$ mit anderer Zugehörigkeit hat
+($f_{wshed}(p) \neq f_{wshed}(q)$) legt dazu ein Polygon an der Grenze
+zwischen $p$ und $q$ an.  Aus Effizienzgründen werden diese Polygone
+nicht als Instanzen der Basisklasse \code{SGLPolygon} angelegt.
+Stattdessen wird die Erkennung Grenzen und das anlegen der
+entsprechenden Polygone innerhalb der \code{generate()}-Routine der
+Objektklasse \code{GlvlMinima} ausgeführt, wobei das Objekt zwar
+kompiliert jedoch nicht gezeichnet wird. \code{GlvlMinima} wird zu
+diesem Zweck von der Basisklasse \code{SGLFlObj} abgeleitet. Im
+Zeichenpuffer des \fachw{Renderers} liegen somit durch ihre
+Grenzflächen, definierte \fachw{Minima-Körper} für jedes durch
+\fachw{watershed} erkannte Unterobjekt. Das für
+\code{GlvlMinima}-Objekte sehr aufwendige \code{generate()} muss
+lediglich einmal durchgeführt werden, da sich die durch sie
+repräsentierten \fachw{Minima-Körper} nicht verändern. (siehe
+``Caching von Zeichenoperationen'' in Abschnitt \vref{displist}). Die
+Anwendungsseitigen Kontainer dieser Objekte (Instanzen der Klasse
+\code{GlvlMinima}) werden in einer Liste unter dem Index des lokalen
+Minimas mit dem entsprechenden Einzugsgebiet gespeichert.  Bewegt sich
+der Cursor auf einen Punkt $p$ im Texturraum, kann der
+\fachw{Minima-Körper} in dem sich $p$ befindet direkt durch den Wert
+von $f_{wshed}(q)$ angesprochen werden.  Ausschließlich dieser
+ausgewählte \fachw{Minima-Körper} wird gezeichnet.  Die Auswahl und
+Darstellung eines \fachw{Minima-Körpers} für weitere Bearbeitung ist
+somit äußerst effizient, und kann daher problemlos interaktiv
+angewendet werden.
+
+Die Aufgabe der Visualisierung nach der
+\fachw{watershed}-Transformation besteht somit darin, dem Nutzer die
+entsprechenden Unterobjekte anzuzeigen, und ihn beim ``Einsammeln''
+dieser zu unterstüzen.
+

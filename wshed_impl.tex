@@ -1,0 +1,778 @@
+\chapter{Implementierungen der \fachw{watershed}\hyp{}Transformation}
+\label{cha:watershed_impl}
+
+\section{Allgemeine Datenstrukturen}
+
+Die Struktur des Graphen eines Bildes, d.h. die Liste der Punkte ($D$)
+und die Liste ihrer Kanten bzw. Bögen untereinander ($E$) sind relativ
+unabhängig von den Grauwerten dieses Bildes ($f$). Die Menge der
+Punkte hat sich in den bisherigen Ausführungen nie geändert. Es wurden
+stets die selben Punkte verwendet. Lediglich ihre Beziehungen
+zueinander haben sich einmal geändert. Aus Kanten zwischen
+geodätischen Nachbarn wurden gerichtete Bögen zu Punkten mit
+niedrigerem Funktionswert. Dem stehen mehrere Werte entgegen, die eine
+Funktion $f$ für einen bestimmten Punkt aus $D$ liefern kann. Es ist
+daher sinnvoll, Daten und Struktur eines Bildes in der Implementation
+zu trennen.
+
+
+\subsection{Der Container für Bilddaten \code{Bild}}
+
+Die Bilddaten sind die, jedem Punkt aus der Menge $D$ zugeordneten
+Grauwertwerte in den verwendeten digitalen Bildern. Ist $F$ das
+Grauwertgebirge eines Bildes, so bildet die Funktion $f$ aus der Menge
+der Punkte in die Menge der Grauwerte dieses Bildes ab ($f:D\mapsto
+F$). Die Klasse \code{Bild} bietet einen Container für die Bilddaten
+und gleichzeitig eine Funktion, die für einen übergeben Punkt $p \in
+D$ aus diesen Daten das entsprechende von $f(p)$ liefert. Im
+Nachfolgenden werden für verschiedene Funktionen $f$ zur Abbildung in
+verschiedene Grauwertgebirge verschiedene Instanzen dieser Klasse
+verwendet werden.  Diese Instanzen werden vereinfachend als ``Bild X''
+bezeichnet werden, wobei ``X'' der Bezeichnung der Funktion $f$
+entspricht (z.B. ``Bild f'' oder ``Bild $f_{LC}$'').
+
+\lstinputlisting{Bild.cpp}
+
+Der Codeausschnitt zeigt, dass \code{Bild} eine parametrisierte Klasse
+ist, deren Instanzen an den Wertebereich angepasst werden können, in
+den die verwendete Funktion abbilden soll. Der Konstruktor legt mit
+den Informationen über die Dimensionen des Bildes einen entsprechend
+großen Speicherbereich an. Dabei greift er je nach Voraussetzungen auf
+die günstigste Systemfunktion zurück. Der überladene \code{[]}-Operator
+stellt die Funktionalität von $f(p)$ zur Verfügung. Das heißt er
+bildet die übergebenen Punkte in den Wertebereich des Bildes ab. Dabei
+gibt er Referenzen zurück Es ist somit auch möglich Werte zu
+schreiben ($f(p) \leftarrow x$).
+
+\subsection{Der Container für Graphendaten \code{Punkt}}
+\label{class:Punkt}
+
+Die Struktur des Graphen eines Bildes wird indirekt durch die einzelnen
+Knoten des Graphen gespeichert. Jeder dieser Knoten stellt einen Punkt
+des Bildes dar. Neben Informationen über seine Position innerhalb des
+Bildes hält jede Punkt eine Liste mit Referenzen auf Punkte, zu denen
+er Bögen bzw. Kanten hat.
+
+\lstinputlisting{Punkt.cpp}
+
+Die Punktlisten \code{neighboursA} und \code{neighboursB} halten
+Referenzen auf senkrechte und waagerechte bzw. auf diagonale Nachbarn
+der Punkte. Diese zwei Listen bilden somit die Kantenmenge $E$ des
+Graphen des ursprünglichen Bildes. Die Bögen aus $E_{LC}$ werden durch
+die Liste \code{sortetNeighbours} gehalten. Diese Liste speichert
+zusätzlich zu der Referenz des Punktes, zu dem der jeweilige Bogen geht,
+den Wert von $T^\pi _f(p,q)$. Sie sortiert die Einträge nach diesem
+Wert, so dass die steilsten Bögen am Ende der Liste stehen. Ist die
+Liste vollständig, ergibt \code{sortetNeighbours.rbegin()->first}
+dadurch immer den maximalen Abstieg und alle Einträge ab
+\code{sortetNeighbours.lower\_bound(LS)} haben mindestens den Abstieg
+$LS$.
+
+\section{\fachw{Watershed}\hyp{}Transformation mittels Wurzelsuche}
+\label{wurzel:impl}
+
+Die auf der Wurzelsuche basierende Implementation der
+\fachw{watershed}\hyp{}Transformation ist rekursiv und jede
+Verzweigung der Rekursion läuft isoliert ab. Sie is somit unabhängig
+von allen anderen Verzweigungen des selben Rekursionsschrittes. Die
+Wurzelsuche lässt sich daher bei Bedarf leicht parallelisieren.
+
+Dieser von \citet{oai:CiteSeerPSU:114309} publizierte Algorithmus zur
+Umsetzung der \fachw{watershed}-Transformation setzt ein
+plateaubereinigtes Bild mit dem Graphen $G_{LC}$ vorraus.  Jeder Punkt
+$p$ des Graphen $G_{LC}$ hat dabei einen Bogen zu seinem Nachbarn $q
+\in N_G(p)$ ($(p,q) \in E_{LC}$), wenn $f_{LC}(q)<f_{LC}(p)$ gilt.
+Diese Bögen können also nur ``von oben nach unten'' gehen, was Kreise
+ausschließt. Für die Wurzelsuche muss das Bild plateaufrei sein. Der
+erste Schritt besteht somit darin, das ursprüngliche Bild in ein
+plateaufreies Bild zu transformieren.
+
+\subsection{Von $G=(D,E,f)$ zum plateaufreien $G_{LC}'=(D,E,f_{LC})$ }
+
+Den Überlegungen in Abschnitt \vref{wshed:diskret} folgend erzeugt die
+folgende Funktion aus den Strukturinformationen ($D$ und $E$) und den
+Grauwerten ($f$) des originalen Bildes einen neuen Satz Grauwerte
+$f_{LC}$, indem sie für alle Punkte $p \in D$ den Wert von $f_{LC}(p)$
+bestimmt.
+
+\lstinputlisting{LC.cpp}
+
+Die Variable \code{dist} wird mit $1$ initialisiert.  Die erste
+Schleife [Zeilen 6-14] trägt für alle Punkte $p$ für die $\exists q
+\in N_{G_E}(p):f(q)<f(p)$ gilt in $f_{LC}$ einen ungültigen Wert ein,
+und hängt diese Punkte hinten an eine FIFO\hyp{}Liste an. Alle anderen
+Punkte sind entweder lokale Minima oder Teil eines Plateaus. Für sie
+wird in $f_{LC}(p) \leftarrow 0$ gesetzt. Nach Abschluss der Schleife
+wird abschließend eine Trennmarkierung an die Liste angefügt.
+
+Die zweite Schleife [Zeilen 17-41] prüft, ob einer der Punkte aus der
+FIFO\hyp{}Liste gleichwertige Nachbarn hat. In der Liste können zwar
+ausschließlich Punkte vorkommen, die mindestens einen niederwertigeren
+Nachbarn haben.  Dennoch kann ein weiterer Nachbar eines dieser Punkte
+gleichwertig sein.  Ein solcher Punkt, der sowohl gleichwertige als
+auch niederwertigere Nachbarn besitzt, ist der Rand eines Plateaus.
+All seine gleichwertigen Nachbarn, die selbst keinen niederwertigeren
+Nachbarn haben, werden am Ende der FIFO\hyp{}Liste angefügt (hinter
+der Markierung). Es ist zu beachten, dass aufgrund der ersten Schleife
+an dem, für einen Punkt $p$ in $f_{LC}$ eingetragenen Wert leicht zu
+erkennen ist, ob dieser Punkt niederwertigere Nachbarn hat. Dies muss
+nicht wiederholt geprüft werden. Nachdem sich die gefundenen
+Plateaupunkte in der Liste befinden, wird für sie in dem Bild $f_{LC}$
+ein ungültiger Wert eingetragen.  Das verhindert, dass sie ein zweites
+mal von einem anderen Randpunkt des Plateaus aus an die Liste
+angehängt werden können. Die Schleife setzt zudem für jeden anderen
+Punkt der Liste den Wert in $f_{LC}$ auf die Entfernung, die dieser
+Punkt zum nächsten niederwertigeren Punkt hat. Die Entfernung beträgt
+anfangs $1$, da sich nur Punkte mit niederwertigeren Nachbarn in der
+Liste befinden.  Stößt die Schleife jedoch zum ersten Mal auf die
+Trennmarkierung, müssen alle folgenden Punkte Plateaupunkte sein. Sie
+sind daher mindestens zweit Schritte von einem niederwertigeren Punkt
+entfernt.  Diese Punkte müssen einen Schritt über den Nachbarn
+vornehmen, der sie in die Liste eingetragen hat, um zu einem
+niederwertigeren Punkt zu gelangen. Die Nachbarn dieser Punkte können
+nur noch gleichwertig sein, da der Rand des Plateaus bereits
+bearbeitet wurde. Die Prüfung auf Gleichwertigkeit ist aus diesem
+Grund eigentlich nicht mehr notwendig. Alle Nachbarn, die noch nicht
+untersucht wurden, werden wiederum hinter einer neuen Trennmarkierung
+in die Liste aufgenommen.  Ihre Entfernung zu einem niederwertigeren
+Punkt ist abermals um einen Schritt größer geworden. Auf diese Weise
+``wachsen'' alle Plateaus von außen zu. Nach dem Ende der Schleife
+entspricht der für jeden Punkt $p$ in $f_{LC}$ eingetragene Wert
+$d(p)$.
+
+Die letzte Schleife [Zeilen 42-52] ermittelt nur noch für jeden Punkt
+$p$ $f_{LC}(p)$ aus seinem nun bekannten $d(p)$ und trägt diesen Wert
+in $f_{LC}$ ein. An dieser Stelle lassen sich auch leicht lokale
+Minima identifizieren. Alle Punkte $p$, für die noch immer
+$f_{LC}(p)=0$ gilt können nur zu einem Minimum gehören.  Diese
+nebenbei erhaltene Information wird in dem Bild $idx$ abgelegt, da sie
+noch beim Aufbau des Graphen gebraucht wird. Der entstandene Graph
+$G_{LC}'=(D,E,f_{LC})$ ist plateaufrei. Es gibt neben den lokalen
+Minima keinen Punkt ohne nach $f_{LC}$ niederwertigeren Nachbarn mehr.
+Für alle Punkte $p \in D \cap {\underset{i \in I}{\bigcup}m_i} $ ($I$
+sei die Menge der Minima\hyp{}Indexe) gilt $\Pi^\downarrow
+_{f_{LC}(p)} \neq \emptyset$. Das Bild ist plateaufrei.
+
+\subsection{Von $G_{LC}'=(D,E,f_{LC})$ nach $G_{LC}=(D,E_{LC},f_{LC})$}
+
+Die Bögen für $E_{LC}$ können nun relativ einfach erzeugt werden.  Der
+Abstieg von einem Punkt $p$ zu einem anderen Punkt $q$ wird durch
+$\frac{f_{LC}(p)-f_{LC}(q)}{d(p,q)}$ bestimmt. Es handelt sich um ein
+diskretes Bild in dem der geodätische Abstand zweier Nachbarn immer
+$1$ ist. Daher gilt somit $\forall p \in D[ \forall q \in N_{G_{LC}} :
+d(p,q)=1]$, denn $p$ und $q$ sind Nachbarn. Es wird also ein Bogen von
+einen Punkt $p$ auf seinen Nachbarn $q$ in $E$ eingetragen, wenn
+$f_{LC}(p)-f_{LC}=LS(p)$ maximal ist. Werden diagonale Nachbarn mit
+einbezogen, muss für diese $d(p,q)=\sqrt{2}$ bzw.  $d(p,q)=\sqrt{3}$
+bei Volumenbildern angenommen werden.
+
+\lstinputlisting{build_graph.cpp}
+
+Da $LS(p)$ unbekannt ist, weicht diese Implementierung leicht von der
+obigen Definition ab. Um $LS(p)$ zu bestimmen müssten alle Nachbarn,
+die mindestens um $1$ niederwertiger sind untersucht werden um das
+Maximum, also $LS(p)$ zu finden. Stattdessen nimmt die Schleife alle
+Nachbarn $q$ mit $f_{LC}(p)-f_{LC} \geq 1$ zusammen mit diesem Wert
+($f_{LC}(p)-f_{LC}$) in eine Liste auf.  Die Liste wird dabei nach
+diesem Wert sortiert, daher sammeln sich die Punkte, für die
+$f_{LC}(p)-f_{LC}$ maximal, und damit gleich $LS(p)$ ist automatisch
+am Ende der Liste.
+
+Eine Eintragung in dieser Liste wird als Bogen von dem Besitzer dieser
+Liste zu dem eingetragenen Punkt betrachtet. Nach Abschluss dieser
+Funktion gibt es für jeden Punkt, der nicht zu einem lokalen Minimum
+gehört, einen Pfad zu einem solchen.  Da ein Punkt eine konstante
+maximale Anzahl von Nachbarn hat, bleibt maximale Länge der sortierten
+Liste konstant. Der Aufwand für das Einfügen in diese Liste ist daher
+ebenfalls konstant bzw. unabhängig von der Größe des Bildes.
+Gleichzeitig hat jeder Punkt mindestens ein Bogen, der zu einen
+niederwertigeren Punkt führt, so dass in jeder dieser Listen
+mindestens ein Eintrag steht.
+
+Die einzigen Punkte, für die das nicht zutrifft, sind Punkte, die zu
+einem lokalen Minimum gehören. Für diese Punkte $p$ gilt immernoch
+$\Pi^\downarrow _{f_{LC}(p)}=\emptyset$. Sie können somit keinen Bogen
+zu einem niederwertigeren Punkt besitzen. Um dem Algorithmus
+garantieren zu können, dass von jedem Punkt ein Bogen zu einen Punkt
+führt, müssen diese Punkte ein Bogen zu sich selbst besitzen. In ihrer
+Liste für niederwertigere Punkte müssen sie folglich selbst als
+einziger Eintrag mit dem Abstand $0$ eingetragen werden. Diese Punkte
+können auf diese Weise als Wurzel erkannt werden. Jedoch muss davon
+ausgegangen werden, dass es für jedes lokale Minimum $m$ mehr als
+einen Punkt $p \in m$ gibt.  Diese Punkte $p$ mit $\Pi^\downarrow
+_f(p)=\emptyset$ gelten als Wurzel des Graphen $G_{LC}$ (Der Graph
+kann mehrere Wurzeln haben).  Jeder Wurzel in $G_{LC}$ wird in der
+nächsten Funktion ein eindeutiger Index zugewiesen werden.  Jeder
+dieser eindeutigen Indexe steht wiederum für ein lokales Minimum. Für
+alle anderen Punkte wird in der eigentlichen Wurzelsuche über die
+bereits erstellten Bögen die am nächsten liegende Wurzel gesucht, und
+ihnen der Index dieser Wurzel zugewiesen. Besteht ein lokales Minimum
+aus mehreren Punkten, ist es möglich, dass Punkten, die im
+Einzugsbereich dieses Minimums liegen, verschiedene Wurzeln zugewiesen
+werden. Sie werden also fälschlicherweise als zu verschiedene Minima
+gehörend angesehen. Um das zu verhindern, darf ein Minimum nur aus
+einer Wurzel bestehen. Zu diesem Zweck wird für jedes Minimum $m$ ein
+beliebiger Punkt $p_m \in m$ ausgewählt, der stellvertretend als
+Wurzel für das Minimum steht. Allen Punkte aus $m$ (auch $p_m$) wird
+daraufhin statt dem Bogen auf sich selbst einen Bogen auf $p_m$
+eingetragen.  Dabei bleibt die topographische Länge dieser Bögen zu
+$p_m$ $0$, da alle Punkte aus $m$ gleichwertig sind. Folglich hat der
+ausgewählte Punkt $p_m$ als einziger Punkt des entsprechenden lokalen
+Minimums einen Bogen auf sich selbst und ist somit die einzige Wurzel
+des Minimums $m$.
+
+Die Punkte eines lokalen Minimums haben per Definition den gleichen
+Wert wie die Wurzel, die dieses Minimum repräsentiert. Es wird um sie
+herum immer Punkte geben, die höher liegen, sonst wären sie nicht Teil
+eines Minimums. Folglich können solche Punkte höchstens einem Minimum
+angehören, sie sind nur von einem lokalen Minimum aus erreichbar, ohne
+dass der Pfad über höhere Punkte verlaufen muss. Ist ein lokales Minimum
+$m$ bekannt und durch einen beliebigen Punkt $p_m \in m$
+repräsentiert, lassen sich alle gleichwertigen Punkte in Nachbarschaft
+von $p_m$ diesem Minimum durch einfache Wertevergleiche zuordnen.
+Diese Operation wird rekursiv für jeden gleichwertigen Nachbarn von
+$p$ wiederholt, indem dieser wiederum gleichwertige Nachbarn sucht,
+die noch nicht eingeordnet wurden. Diese Rekursion kann auch genutzt
+werden, um jeweils jedem Minimum bzw.  seinen Punkten einen
+eindeutigen Index zuzuweisen. Dies ist möglich, da jeder obersten
+Verzweigung der Rekursion ein lokales Minimum entspricht.  Alle
+Punkte, die zu diesem Minimum gehören, werden in dem entsprechenden
+Zweig der Rekursion behandelt. Auf diesem Wege kann ihnen der Index
+des Minimums zugewiesen werden. Der folgende Quelltextausschnitt zeigt
+die zwei Funktionen, die diese Aufgaben erfüllen.
+
+\lstinputlisting{label_minima.cpp} 
+
+Die äußere Funktion \code{labelMinima} ruft für jeden Punkt die
+Rekursion \code{setMinLabel} auf. Wurde eine Rekursion erfolgreich
+abgeschlossen, geht die äußere Funktion davon aus, dass eine Menge $m$
+vollständig ist, und erhöht den Index. Die Rekursion nutzt die bei der
+Plateaubeseitigung gesammelte Information über lokale Minima, um zu
+erkennen, ob für den behandelten Punkt $p$ $p \in m$ gilt. Ein
+direkter Wertevergleich ist nicht notwendig. Es reicht zu prüfen, ob
+der behandelte Punkt teil eines Minimums ist. Ist dies der Fall,
+bekommt er einen Bogen zu dem übergebenen Ursprungspunkt. Der Vermerk,
+dass er einem Minimum angehört, wird durch den Index des Minimums
+überschrieben, dem er angehört. Dieser Punkt wird ab diesem Zeitpunkt
+also nicht mehr als Teil eines Minimums angesehen und dadurch auch
+nicht wiederholt betrachtet. Danach wird die Rekursion für jeden
+seiner Nachbarn ($N_G(p)$) mit dem gleichen Index und dem gleichen
+Ursprungspunkt ausgeführt. Ist der behandelte Punkt jedoch kein Teil
+eines Minimums bricht dieser Zweig der Rekursion erfolglos ab.
+
+Wie bereits in diesem Abschnitt erklärt, kann kein Punkt mehreren
+Minima angehören. Es wird also kein Punkt mehrfach betrachtet, zumal
+dieser nach der ersten Betrachtung ohnehin nicht mehr als Teil eines
+Minimums erkannt wird.  Da bereits bekannt ist, welche Punkte einem
+Minimum angehören, müssen sie nicht mehr durch eine Suche ermittelt
+werden. Der Aufwand dieser Operation übersteigt somit nie $O(n)$ wobei
+$n$ die Anzahl der Punkte im Bild ist. In der Praxis liegt der Aufwand
+meist weit unter O(n), denn zusammenhängende Gruppen gleichwertiger
+Punkte in einem lokalen Minimum stellen meist nur einen kleinen Teil
+aller Punkte des Bildes dar.
+
+Damit ist der Graph $G_{LC}=(D,E_{LC},f_{LC})$ komplett, und es kann
+mit der eigentlichen Wurzelsuche begonnen werden. 
+
+
+\subsection{Die Wurzelsuche in $G_{LC}$}
+
+Die \fachw{watershed}\hyp{}Transformtion des ursprünglichen Bildes findet über
+eine Wurzelsuche in $G_{LC}$ statt. Sie weist jedem Punkt, der noch
+keinen Index hat, den Index der Wurzel zu, zu der der Pfad am steilsten
+ist. Dadurch wird eine Zuordnung aller Punkte zu einem
+Einzugsbereich und damit eine sinnvolle Gruppierung erreicht. Die
+Punkte, die auf diese Weise mindestens zwei Wurzeln (d.h. Minima)
+zugeordnet wurden, werden wie spezifiziert als Wasserscheide markiert.
+Diese Markierung erfolgt über einen speziellen Index, der sonst nicht
+vorkommt. Wie im folgenden Ausschnitt zu sehen ist, ist auch diese
+Funktion wieder zweigeteilt und rekursiv.
+
+\lstinputlisting{root_find.cpp}
+
+Die äußere Funktion \code{findRoot} verwendet die rekursive Funktion
+\code{resolve}, um die eindeutige Wurzel jedes Punktes zu ermitteln.
+Ist die ermittelte Wurzel gültig, wird in dem Bild \code{idx} den
+Index seiner Wurzel vermerkt. Ist die Wurzel jedoch ungültig, geht die
+äußere Funktion davon aus, dass die Wurzel nicht eindeutig ermittelt
+werden konnte. In diesem Fall, wird der Punkt in \code{idx} als
+Wasserscheide eingetragen. Die innere Funktion [Zeilen 1-21] sucht für
+jeden übergeben Punkt \code{p} die Wurzel. Dazu untersucht sie alle
+Punkte \code{q} zu denen von \code{p} aus ein Bogen existiert und
+deren gemerkter Grauabstand ($f_{lc}(p)-f_{lc}(q)$) maximal ist ($q \in
+\Gamma(p)$) [Schleifenkopf Zeilen 6-8]. Ist \code{q} ein gültiger und
+normaler Punkt, wird seine Wurzel rekursiv bestimmt. Das Ergebnis
+ersetzt den LC-Nachbarn in der Variablen \code{q} [Zeilen 11-12].
+Die folgenden Iterationen (weitere LC\hyp{}Nachbarn) laufen bis Zeile
+13 gleich ab.  Es wird eine Wurzel für den LC\hyp{}Nachbarn in dem
+Eintrag \code{i} gesucht, und in \code{q} abgelegt.  In Zeile 15 wird
+nun jedoch die neu gefundene Wurzel mit der Wurzel verglichen, die der
+Vorherige durchlauf ergeben hat.  Sind beide verschieden wird der
+Rückgabewert der Funktion ungültig.  Die Schleife bricht in
+diesem Fall ab und gibt den ungültigen Wert zurück.  Daraufhin wird
+die äußere Funktion noch den betrachteten Punkt wie beschrieben als
+Wasserscheide markieren.
+
+Im Ergebnis besitzen alle Punkte entweder einen gültigen Index oder
+sind eine Wasserscheide.
+
+\subsection{Zusammenfassung}
+
+Die Umsetzung der \fachw{watershed}\hyp{}Transformation mittels
+Wurzelsuche interpretiert ein plateaufreies Bild als
+Graphen auf einem plateaufreien Wertegebirge. Sie führt in diesem
+Graphen für jeden Knoten eine rekursive Wurzelsuche durch, wobei jedes
+lokale Minima eine Wurzel ist. 
+
+Hat ein als Punkt interpretierter Knoten niedrigere Nachbarn, bildet
+er Bögen zu den Nachbarn, zu denen der Unterschied des Grauwertes
+maximal ist. Knoten ohne niedrigere Nachbarn, gehören einem lokalen
+Minimum an. Sie bilden einen Bogen zu dem Punkt aus, der
+stellvertretend für das Minimum steht, dem sie angehören.  Dies gilt
+ebenfalls für den stellvertretenden Punkt selbst.  Damit sind alle Punkte
+eines lokalen Minimums (einer Senke) diesem Minimum zugeordnet.  In
+dem nun vollständigen Graphen versuchen während der Wurzelsuche die
+restlichen Punkte über einen möglichst steilen Pfad einen Punkt zu
+erreichen, der bereits einem Minimum zugeordnet ist. Es wird nicht
+gefordert, dass dieser gefundene Punkt selbst Teil eines Minimums ist.
+Auf diese Weise können schon bekannte steilste Pfade wiederverwendet
+werden.  Hat ein Punkt ersteinmal einen kürzesten Pfad gefunden,
+besteht eine gute Chance, dass Punkte in seiner Nähe diesen Pfad
+mitbenutzen können.  Dabei zeigt sich jedoch ein Problem der
+rekursiven Definition des kürzesten Pfades zur Wurzel. Sie bewirkt,
+dass alle Punkte die im \fachw{upstream} einer Wasserscheide liegen
+selbst eine Wasserscheide sind. Allerdings ist gerade bei falschen
+Wasserscheiden die Wahrscheinlichkeit groß, dass Punkte in ihrem
+\fachw{upstream} liegen.
+
+Eigentlich können Wasserscheiden nach ihrer Definition nur auf
+``Bergspitzen'' vorkommen. Das gilt aber nur, wenn ein Punkt unendlich
+viele Nachbarn hat, denn nur dann kann er wirklich den steilsten Weg
+nach unten wählen. Je weniger Nachbarn ein Punkt hat (Konnektivität),
+umso weiter muss er mit seinem ``Abstieg'' vom Optimalen (steilsten)
+Weg abweichen.  Unter ungünstigen Bedingungen kann das zu mehreren
+Pfaden zu mehreren Minima führen. Keiner dieser Pfade ist dabei
+wirklich der steilste, sie sind nur zufällig gleich weit vom
+eigentlichen Optimum entfernt. Der entsprechende Punkt wird trotzdem
+als Wasserscheide interpretiert. Diese falschen Wasserscheiden liegen,
+wie gesagt, nicht gezwungenermaßen auf einer Bergspitze, folglich gibt
+es mit großer Wahrscheinlichkeit Punkte in ihrem \fachw{upstream}.
+
+Aus \vref{wshed_discret:def} ergibt sich, dass jeder Punkt, der bei
+seiner Wurzelsuche auf eine Wasserscheide trifft, selbst zu einer
+wird. Sein bisheriger Weg bis zu dem Wasserscheide\hyp{}Punkt, war so
+steil wie möglich.  Es ist auch bekannt, dass der von dem gefundenen
+Punkt ausgehende Pfad maximal steil ist, weshalb der gesamte Pfad der
+steilstmöglichste Pfad zu der entsprechenden Wurzel ist. Folglich kann
+der suchende Punkt die Zuordnung des aktuellen Punktes übernehmen,
+denn aufgrund der Definition würde er wieder den gleichen Pfad finden.
+Durch die Übernahme der Zuordnung spart er sich den weiteren Weg nach
+unten, und damit Rechenzeit.  Ist der aktuelle Punkt aber eine falsche
+Wasserscheide, ist er also fälschlicherweise mindestens zwei Minima
+zugeordnet, pflanzt sich dieser Fehler nun unkontrolliert fort.
+Falsche Wasserscheiden ``wachsen'' so zusätzlich an. Der Fehler dabei
+liegt nicht in der ``Abkürzung'', sondern in der rekursiven Definition
+der Wurzelsuche. Er lässt sich daher nicht vermeiden.
+
+Die Form der Senken in einem Bild und die Konnektivität beeinflussen
+wieviele Punkte fälschlicherweise als Wasserscheide deklariert werden.
+Die Abbildungen \vref{test_topograph_direct} und \vref{test_topograph_inv}
+illustrieren dies (schwarze Bereiche sind Wasserscheiden).
+
+\inclfiguress{test_orig}{test_topograph_direct_low}{test_topograph_direct}{4cm}{\fachw{watershed}\hyp{}Transformation
+  eines ungünstigen Bildes mittels Wurzelsuche}{test_topograph_direct}
+
+Die \abb{test_topograph_direct} zeigt sehr deutlich, wie ein
+ungünstiges Bild zu großen Fehlern in den
+\fachw{watershed}\hyp{}transformierten Bildern führen kann. In dem
+gezeigten Fall sorgt die Form der Senke im Original (der schwarze Ring
+im linken Bild) für Probleme bei der Zuordnung der Punkte.  %Sucht ein
+%Punkt innerhalb der weißen Fläche in der Mitte eine Wurzel, variieren
+%die Längen, und damit auch die Steilheit der Pfade zu den Wurzeln
+%innerhalb des schwarzen Ringes nur gering.  Aufgrund der begrenzten
+%Anzahl von Nachbarn werden dann Pfade bevorzugt, die vom optimalen
+%Pfad abweichen. 
+Im mittleren Bild können nur senkrechte und waagerechte Pfade
+eindeutig als kürzeste Pfade erkannt werden. Die Punkte kennen dort
+nur die Nachbarn neben, und über ihnen. Im rechten Bild kommen noch
+die diagonalen Nachbarn hinzu. Wie man sieht entschärft diese Erhöhung
+der Konnektivität das Problem falscher Wasserscheiden zwar merklich,
+kann ihre Entstehung aber nicht verhindern.
+
+\inclfiguress{test_inv}{test_topograph_inv}{test_topograph_inv}{4cm}{\fachw{watershed}\hyp{}Transformation
+  eines günstigen Bildes mittels Wurzelsuche}{test_topograph_inv}
+
+Die \abb{test_topograph_inv} zeigt den umgekehrten Fall. Durch die
+günstige Form der Senke in der Mitte entstehen dort keine falschen
+Wasserscheiden.  Lediglich die tiefen Ränder des Bildes verursachen
+waagerecht bzw.  senkrecht verlaufende Wasserscheiden wo keine sein
+dürften. Im Gegensatz zur vorherigen Abbildung kommen sie hier aber
+sehr viel seltener vor. Die Erhöhung der Konnektivität hat bei diesem
+Beispiel keinen Einfluss.
+
+Die Vorteile der \fachw{watershed}\hyp{}Transformation mittels Wurzelsuche
+liegen in ihrer relativ hohen Geschwindigkeit und ihrer einfacheren
+Parallelisierbarkeit. Sie hat jedoch den Nachteil, dass sie unter
+ungünstigen Bedingungen eine hohe Fehlerrate aufweist.
+
+
+
+\section{\fachw{Watershed}\hyp{}Transformation mittels Absenken}
+
+Da die Implementation der \fachw{watershed}\hyp{}Transformation als
+Wurzelsuche \cite{oai:CiteSeerPSU:114309}  unter bestimmten Umständen zu großen Erkennungsfehlern
+führt, sollte die Anwendung eine Alternative Implementierung bieten,
+die dieses Problem nicht hat. Die dazu ausgewählte Implementierung
+nach \citet{vincent} basiert statt der Wurzelsuche auf dem Versenken
+des Grauwertgebirges (in Wasser). Die Pfade zu den Minima werden nicht
+für jeden Punkt einzeln, sondern Schritt für Schritt für alle Punkte
+gleichzeitig gebildet. Die Vervielfachung falsch erkannter
+Wasserscheiden wird auf diese Weise vermieden. Da außerdem Plateaus
+korrekt behandelt werden, ist eine Vortransformation des Bildes nicht
+nötig.  Dieser Algorithmus besteht jedoch aus mehreren teilweise
+ineinander verschachtelten Schleifen.  Sie besitzt daher theoretisch
+eine höhere Zeitkomplexität als die
+\fachw{watershed}\hyp{}Transformation mittels Wurzelsuche.
+
+\subsection{Implementation nach Vincent\hyp{}Soille}
+\label{vincent:impl}
+
+Für die \fachw{watershed}\hyp{}Transformation mittels Absenken müssen
+sämtliche Punkte des Bildes ($p \in D$) aufsteigend nach ihrem
+Grauwert $f(p)$ sortiert sein. Der Vincent\hyp{}Soille\hyp{}Algorithmus
+besteht hauptsächlich aus einer großen Schleife, die den Pegel $h \in
+\menge{N}$ sukzessive von $h_{min}$ nach $h_{max}$ durchläuft. Das
+entspricht einem ``Versenken'' des Grauwertgebirges und sollte nicht
+mit einem ``Volllaufen'' des selbigen verwechselt werden.  Die
+``Pegelhöhe'' ist im gesamten Gebirge zu jedem Zeitpunkt gleich. Der
+folgende Codeausschnitt zeigt den Funktionskopf, einige nötige
+Initialisierungen und den Anfang dieser Schleife.
+
+\lstinputlisting[firstline=1,lastline=22]{vincent.cpp}
+
+Wie im nächsten Ausschnitt zu sehen, werden innerhalb der Schleife
+zuerst alle Punkte $p$ mit $f(p)=h$ untersucht.  Dabei bekommt jedes
+neue lokale Minima einen eindeutigen Index, den es später an alle
+Punkte in seinem Einzugsbereich weitergibt. Außerdem werden alle
+Punkte mit $f(p)=h$ markiert. Da die Punkte in der Liste nach $f(p)$
+sortiert sind, muss die Liste nicht durchsucht werden, um alle Punkte
+mit $f(p)=h$ zu finden.  Hat einer dieser Punkte einen Nachbarn, der
+bereits mindestens einer Einflusszone angehört, wird er an eine
+FIFO\hyp{}Liste angehängt. In dieser Liste stehen nun alle
+``Uferpunkte'' des aktuellen Pegelstandes. Als Abschluss wird an die
+FIFO\hyp{}Liste eine Trennmarkierung angehängt.
+
+\lstinputlisting[firstline=23,lastline=42]{vincent.cpp}
+
+Diese ``Uferpunkte'', d.h. alle Punkte $p \in fifoA$ müssen nun
+indiziert werden. Das heißt, sie müssen entweder eindeutig einem
+Bassin zugeordnet, oder als Wasserscheide identifiziert werden. Diese
+Aufgabe wird von der im nächsten Ausschnitt gezeigten Schleife
+erfüllt, indem sie jeweils einen Eintrag aus der FIFO\hyp{}Liste der
+``Uferpunkte'' herausnimmt und dessen Umgebung untersucht. Ist der
+aktuelle Punkt \code{p} eine Trennmarkierung, liegen für die aktuelle
+Ausbreitung des Wassers keine (weiteren) ``Uferpunkte'' vor.  Das
+Wasser muss sich in diesem Fall einen Schritt auf Plateaus ausbreiten,
+wenn in dieser Pegelhöhe Plateaus existieren. Die Schleife wird dann
+neu gestartet, um die neuen ``Uferpunkte'' zu bearbeiten [Zeilen
+45-52]. Auf diese Weise wird das Plateauproblem gelöst. Ist der
+aktuelle Punkt keine Trennmarkierung werden seine Nachbarn in den
+Zeilen 53 bis 77 untersucht. Ist einer seiner Nachbarn schon indiziert
+worden, und ist er selbst noch keinem Bassin zugeordnet, übernimmt er
+dessen Zuordnung.  Hat er dagegen schon einen anderen Index, ist er
+folglich gleich weit von zwei Bassins entfernt und wird als
+Wasserscheide markiert. Trifft nichts davon zu, übernimmt der
+untersuchte Punkt ggf. die Wasserscheide\hyp{}Markierung seines Nachbarn.
+Nachbarn, für die zwar $f(p)=h$ gilt, die aber nicht zum aktuellen
+``Ufer'' gehören (erkennbar an \code{dist[*q]==0}) werden mit erhöhtem
+Abstand hinter der Trennmarkierung an die FIFO\hyp{}Liste angefügt. Sie
+werden verarbeitet werden, sobald die Ausbreitung des Wassers
+ausreichend erhöht wurde.
+
+\lstinputlisting[firstline=43,lastline=79]{vincent.cpp}
+
+Alle Punkte $p$ mit $f(p)=h$ die nach dieser Schleife noch nicht
+indiziert wurden, haben nur höhere Nachbarn, sie sind somit Minima.
+Der folgende letzte Ausschnitt zeigt die Schleife, die nocheinmal über
+alle Punkte $p$ mit $f(p)=h$ geht und sie daraufhin untersucht. Dabei
+wird auch der Puffer für die Abstände zurückgesetzt. In den Zeilen 85
+bis 98 bekommen jedes neue Minima und seine Nachbarn gleicher Höhe
+einen eindeutigen Index. Im Gegensatz zu der ersten inneren Schleife
+[Zeilen 23-40] ändert diese Schelife den globalen Iterator \code{aktP} direkt,
+sodass dieser nach ende der Schleife den ersten Punkt $p$ mit $f(p)>h$
+referenziert.
+
+\lstinputlisting[firstline=80,lastline=102]{vincent.cpp}
+
+Damit ist der Block der Hauptschleife zu Ende. Der Pegel $h$ wird um
+eins erhöht und alle Operationen beginnen von vorn. Existieren für
+einen Pegel $h$ keine Punkte mit $f(p)=h$, wird die erste Schleife
+nicht ausgeführt, da $f(p) \neq h$. Dadurch steht in der FIFO\hyp{}Liste
+nur eine Trennmarkierung, die sofort bei der Initialisierung der
+zweiten Schleife [Zeile 43] herunter genommen wird. Die Bedingung
+\code{fifoA.size()} kann d.h. nicht mehr erfüllt werden, und die
+Ausführung der Schleife wird abgewiesen. Für die letzte Schleife gilt
+das Gleiche wie für die Erste, sie wird nicht ausgeführt, da bereits für
+den ersten betrachteten Punkt $p$ $f(p) \neq h$ gilt. Für dieses $h$
+mit $\forall p \in D : f(p) \neq h$ führt die Hauptschleife daher keine
+Operationen aus, sondern erreicht sofort das Ende der Schleife und
+erhöht $h$.
+
+Ist der Pegel $h=h_{max}$ erreicht, wurden alle Punkte $p \in D$
+behandelt, alle lokalen Minima des Gebirges wurden gefunden und
+indiziert sowie alle anderen Punkte ihrem nächsten Minima zugeordnet
+oder als Wasserscheide markiert.
+
+\subsection{Erhöhung der Konnektivität}
+\label{vincent:conn}
+
+Im Gegensatz zur Wurzelsuche  kennt die Implementation nach
+Vincent\hyp{}Soille keine Kostenfunktion.  Stattdessen wird der Geodätische
+Abstand zweier Nachbarn hier fest als $1$ angenommen. Der Abstand
+diagonaler Nachbarn, wie sie bei einer Konnektivität von $8$
+auftreten, beträgt jedoch $\sqrt{2}$.  Daraus folgt, dass der
+Algorithmus, wie er hier implementiert wurde, nur für eine
+Konnektivität von $4$ geeignet ist. Das Fehlen der Kostenfunktion
+zeigt sich beim Ausbreiten des Wassers in der Ebene.  Es lässt sich
+umgehen, indem diese Ausbreitung in mehreren Schritten ausgeführt
+wird. Jeder dieser Schritte ist dann für je eine ``Abstandsart''
+ausgelegt. Zu diesem Zweck sind gesonderte FIFO\hyp{}Listen und
+\code{curdistX}\hyp{}Variablen notwendig.
+
+
+\subsection{Ergebnisse}
+
+Da auch die Implementation nach Vincent\hyp{}Soille weiterhin auf diskreten
+Bildern bzw. diskreten Graphen angewendet wird, werden auch weiterhin
+falsche Wasserscheiden erkannt. Es kommt auch hier vor, dass statt dem
+eigentlich kürzesten Pfad zwei suboptimale Pfade gefunden werden.
+Dieses grundlegende Problem wurde schon besprochen und lässt sich
+schwer unterbinden, da die Diskretität eine grundsätzliche
+Eigenschaft der Eingabedaten ist. Bei Vincent\hyp{}Soille können sich diese
+Fehler allerdings nicht rückwärts über die Wurzelsuche fortpflanzen,
+da es hier keine Wurzelsuche gibt. Auch Plateaus müssen nicht künstlich
+in Hänge verwandelt werden, sie werden bei dieser Implementation
+intuitiver über das Ausbreiten des Wassers in der Ebene behandelt.
+
+Eine Transformation nach Vincent\hyp{}Soille erweist sich daher als relativ
+unempfindlich gegenüber ungünstigen Bildern. Die
+\abb{test_vincent_direct} zeigt die Ergebnisse einer Anwendung auf das
+gleiche ungünstige Bild, in dem die Wurzelsuche über 45000
+Wasserscheiden fand. Analog zu \abb{test_topograph_direct} und
+\abb{test_topograph_inv} wurde für das mittlere Bild eine vierfache
+Konnektivität verwendet, während das rechte Bild das Ergebnis einer
+Transformation mit achtfacher Konnektivität ist. Das Linke Bild ist
+wie immer das Original. Vor allem am mittleren Bild erkennt man die
+Robustheit von Vincent\hyp{}Soille, beziehungsweise im Vergleich dazu das
+totale Versagen der Wurzelsuche.  Während die Wurzelsuche fast das
+gesamte Bild als Wasserscheide ``erkennt'' (ca. 45000 Pixel eines
+256x256 Pixel großen Bildes wurden als Wasserscheide markiert), zeigt
+Vincent\hyp{}Soille ein ähnliches Verhalten wie bei der achtfachen
+Konnektivität. Es werden nur an den ``üblichen'' Punkten falsche
+Wasserscheiden gefunden (ca. 13000 Wasserscheiden in einen 256x256
+Pixel großen Bild).  Es fällt außerdem auf, dass die Schwarzen Linien,
+die die Wasserscheiden darstellen hier nie mehr als einen Pixel breit
+sind.
+
+\inclfiguress{test_orig}{test_vincent_direct_low}{test_vincent_direct}{4cm}{\fachw{watershed}\hyp{}Transformation
+  eines ungünstigen Bildes  mittels Vincent\hyp{}Soille}{test_vincent_direct}
+
+
+\abb{test_vincent_inv} zeigt zum Vergleich das Verhalten von Vincent\hyp{}Soille auf
+einem günstigen Bild. Hier unterscheiden sich beide Implementationen
+kaum. Sowohl bei einer vierfachen, als auch bei einer achtfachen
+Konnektivität fand die Wurzelsuche ca. 1000 Wasserscheiden.
+Vincent\hyp{}Soille liegt mit 989 Wasserscheiden nur knapp darunter.
+
+\inclfiguress{test_inv}{test_vincent_inv}{test_vincent_inv}{4cm}{\fachw{watershed}\hyp{}Transformation
+  eines günstigen Bildes mittels Vincent\hyp{}Soille}{test_vincent_inv}
+
+
+\section{\fachw{Watershed} in dreidimensionalen Bildern}
+
+Bisher wurde der Einfachheit halber in den Betrachtungen zu den
+Implementationen implizit von zweidimensionalen Bildern ausgegangen.
+Die Messdaten liegen dagegen dreidimensional vor. Die
+Implementierungen müssen daher noch an dreidimensionale Bilder
+angepasst werden.
+
+
+\subsection{Anpassung der Algorithmen}
+
+Die Anpassung der Definition der \fachw{watershed}\hyp{}Transformation
+erweist sich als relativ unkompliziert. Die
+\fachw{watershed}\hyp{}Transformation basiert grundsätzlich auf Graphen von
+Punkten als Eingabedaten. Um die \fachw{watershed}\hyp{}Transformation
+auf dreidimensionale Bilder auszulegen reicht es daher für den
+Ausgangsgraphen $G=(D,E,f)$ festzulegen, dass $D \subseteq
+\menge{Z}^3$ gilt. In einem solchen Graphen hat ein Punkt sechs
+direkte Nachbarn, der Abstand zu diesen Nachbarn beträgt $1$.  Liegt
+der Punkt im Zentrum eines, innerhalb dieses Graphen gedachten,
+Würfels mit der Kantenlänge von $2$, so liegen diese Nachbarn jeweils
+im Mittelpunkt einer seiner Seitenflächen. Weitere acht Nachbarn
+kommen als diagonale Nachbarn auf den Koordinatenebenen dazu.  Sie
+liegen in der Mitte der Würfelkanten und ihre Entfernung zum zentralen
+Punkt beträgt $\sqrt{2}$. Die acht Eckpunkte des Würfels stellen mit
+einem Abstand von $\sqrt{3}$ die am weitesten vom zentralen Punkt
+entfernten Nachbarn dar. Statt vier bzw.  acht Nachbarn sind bei
+dreidimensionalen Graphen Folglich sechs, vierzehn oder zweiundzwanzig
+Nachbarn mit drei verschiedenen Abständen zu berücksichtigen. Jede
+Implementierung der \fachw{watershed}\hyp{}Transformation stützt sich auf
+diese Datenstruktur, und ist daher theoretisch wie die mathematische
+Definition der Transformation unabhängig von der Dimensionalität der
+Daten.
+
+Dementsprechend beschränkt sich die konkrete Anpassung der Wurzelsuche
+\cite{oai:CiteSeerPSU:114309} an dreidimensionale Daten auf die
+Verwendung einer, der Lage des Nachbarn entsprechenden Kostenfunktion.
+Weiterhin müssen lediglich entsprechend mehr Nachbarn eines Punktes
+berücksichtigt werden. Die bei der Implementierung für die Speicherung
+der Nachbarn verwendeten Listen passen ihre Länge automatisch den
+Anforderungen an, sodass an dieser Stelle keine Änderung vorgenommen
+werden muss. Es erweist sich jedoch als praktischer die Nachbarn von
+vornherein entsprechend ihrer Lage in verschiedene Listen
+einzusortieren. Damit ist die Art ihrer Nachbarschaft bekannt, und sie
+muss bei Bedarf nicht neu ermittelt werden.  Im Ansatz ist dieses
+Vorgehen auch schon in der gezeigten zweidimensionalen Implementation
+der Wurzelsuche zu sehen.  Für die diagonalen Nachbarn in einem
+zweidimensionalen Graphen mit achtfacher Konnektivität wurde dort eine
+gesonderte Liste \code{neighboursB} eingeführt. Die darin liegende
+Information über die Entfernungen wurde in der Funktion
+\code{buildGraph} für die Kostenberechnung verwendet.  Für die
+Verarbeitung dreidimensionaler Graphen mit zweiundzwanzigfacher
+Konnektivität reicht es daher analog eine weitere Liste
+\code{neighboursC} hinzuzufügen, und entsprechend zu verwenden.
+
+Wie in Abschnitt \vref{vincent:conn} beschrieben sind Entfernungen
+zwischen Nachbarn, die einen anderen Wert als $1$ haben für die
+Implementation nach Vincent\hyp{}Soille \cite{vincent} problematisch.
+Für die Verarbeitung dreidimensionaler Graphen muss daher analog zu
+der dort beschriebenen Lösung ein weiterer Schritt für die Ausbreitung
+des Wassers eingeführt werden.  Die Alternative wäre, sich bewusst auf
+eine sechsfache Konnektivität zu beschränken. Eine solche
+Implementation ist merklich schneller als eine Implementation, die
+zweiundzwanzig Nachbarn berücksichtigen muss.  Die Implementation nach
+Vincent\hyp{}Soille hat sich auch bei geringer Konnektivität als
+robust erwiesen.  Unter Umständen ist es daher sinnvoll einen kleinen
+zusätzlicher Fehler zugunsten der einfacheren Implementation und der
+Geschwindigkeit in Kauf zu nehmen.
+
+
+\subsection{Reduzierung des Speicherbedarfs}
+
+Die in den Abschnitten \vref{wurzel:impl} und \vref{vincent:impl}
+beschriebenen Implementationen sind bewusst naiv gehalten worden, sie
+sind somit gleichzeitig leicht verständlich, und robust. Werden sie
+unverändert für die \fachw{watershed}\hyp{}Transformation
+dreidimensionaler Daten übernommen wächst mit der Anzahl der Punkte
+auch der Speicherbedarf exponentiell an. Zum Beispiel belegt die im
+Abschnitt \vref{class:Punkt} beschriebene Datenstruktur zur
+Repräsentation eines Punktes $0.00015259$ MByte. Das erscheint
+zunächst wenig, jedoch besteht eine typische MRT-Aufname des
+Kenrspintomografen des CBS derzeit aus $5.12$ Millionen Punkten ($160
+\times 160 \times 200$ Punkte), was einen Speicherbedarf $781.26$
+MByte allein für die Punkte ergibt. Dazu kommen der \fachw{overhead}
+durch die Struktur der verwendeten Listen sowie der Speicherbedarf der
+Bilddaten und Zwischenergebnisse. Der Speicherbedarf des gesamten
+Systems kann so schnell mehrere GByte betragen. Dies steht klar im
+Wiederspruch zu dem Anspruch des Programms auch auf einfachen
+Arbeitsplatzrechnern anwendbar zu sein.  Der Speicherbedarf der
+\fachw{watershed}\hyp{}Implementierungen muss also für den praktischen
+Einsatz drastisch verringert werden.
+
+Wie schon beschrieben ``verschwendet'' die Datenstruktur \code{Punkt}
+den meisten Speicher. Instanzen dieser Datenstruktur kommen in sehr
+großer Zahl vor. Jedes hier eingesparte Byte kann daher mehrere MByte
+Gesamtersparnis bringen. Es fällt auch auf, dass sowohl die Nachbarn,
+als auch die Koordinaten eines Punktes jederzeit aus seiner
+Position in der Liste der Punkte und den Dimensionen des Datensatzes
+ermittelt werden kann. Ein Punkt wird somit nur noch durch seinen
+Index in der Liste der Punkte repräsentiert. Er ist daher nur noch $4$
+Byte groß, und die $5.12$ Millionen Punkte eines $160 \times 160
+\times 200$\hyp{}Bildes belegen nur noch knapp $20$ MByte. Die somit
+nötigen Integeroperationen zur Bestimmung der fehlenden Daten
+verlangsamen die Algorithmen zwar etwas, dies ist jedoch angesichts
+einer Einsparung von fast $95\%$ vertretbar. Die Speicherung der
+Punkte in dynamischen Listen ist oft unnötig, da sich die Länge der
+meisten in den Implementationen vorhandenen Listen kaum ändert. Ein
+einfaches Array reicht in diesen Fällen aus, und bringt kaum
+\fachw{overhead} mit. Die Datenstruktur \code{Bild} wird dagegen
+beibehalten, denn sie ist aus Speichersicht bereits optimal. Ihre
+Schnittstelle muss auch nicht angepasst werden, denn der Container
+\code{Punkt} besteht weiterhin, und kann benutzt werden. Lediglich die
+Nachbarlisten werden entfernt. Statt Punkten werden wie beschrieben
+nur deren Indexe in den Punktlisten gespeichert. 
+
+Auf die Implementation der \fachw{watershed}\hyp{}Transformation nach
+Vincent\hyp{}Soille \cite{vincent} angewendet haben diese Anpassungen
+folgende Auswirkungen. Ein einfaches Array hält die Indexe der Punkte
+von $0$ bis $n-1$, wobei $n$ die Anzahl der Punkte ist. Diese Liste
+wird nach den Grauwerten sortiert. Dabei werden aus jedem Index die
+Koordinaten bestimmt. Die Koordinaten werden verwendet, um den
+Grauwert des Entsprechenden Punktes mittels \fachw{vista}-Funktionen
+(\cite{vista} siehe auch Abschnitt \vref{cha:virgil}) direkt aus den
+Messdaten zu bestimmen. Sind die Punkt-Indexe in der Liste sortiert,
+kann der eigentliche Algorithmus beginnen. Er arbeitet die Liste der
+Indexe sukzessive ab, und bestimmt bei Bedarf die Koordinaten der
+Punkte wie beschrieben. Die in der ursprünglichen Implementation
+verwendete FIFO-Liste bleibt als einzige in dieser Form erhalten. Sie
+kann nie mehr Punkte beinhalten, als in einer Ebene der Volumendaten
+vorkommen.  Außerden werden regelmäßig Punkte zu ihr hinzugefügt bzw.
+entfernt, sodass an dieser Stelle ein einfaches Array ungeeignet ist.
+Die verwendeten \fachw{vista}-Funktionen \cite{vista} können direkt
+verwendet werden, um den Grauwert eines Punktes zu ermitteln. Da sie
+die Volumendaten schon von sich aus puffern, ist es nicht nötig diese
+zwischen zu speichern.  Der Container für die Farbwerte (im Beispiel
+\code{im}) kann daher entfallen. Zur Optimierung des Containers für
+die Markierungen (im Beispiel \code{lc}) wird die Konstante
+\code{INIT} zur Markierung unbearbeiteter Punkte von $-1$ auf den
+größtmöglichen Wert des verwendeten Datentyps geändert. Dies Spart das
+Vorzeichenbit ein, und ermöglicht eine effektivere Ausnutzung des
+Wertebereichs.  Zeigt sich in der Praxis, dass nie mehr als $2^16-2$
+Minima vorkommen, kann der verwendete Datentyp auf $16$ Bit reduziert
+werden. Vorerst wird jedoch darauf verzichtet. Die einzigen größeren
+durch die \fachw{watershed}\hyp{}Transformation angelegten Objekte im
+Speicher sind somit die sortierte Punktliste und das Ergebnissbild mit
+den indizierten Punkten. Der Speicherbedarf der Implementation der
+\fachw{watershed}\hyp{}Transformation nach Vincent\hyp{}Soille
+reduziert sich durch diese Optimierungen auf weniger als $50$ MByte.
+Die Voraussetzungen für die Anwendbarkeit auf üblichen
+Desktop\hyp{}Rechnern sind daher für diesem Fall wieder erfüllt.
+
+Die Implementation der Wurzelsuche \cite{oai:CiteSeerPSU:114309} kann
+ähnlich angepasst werden.  Die Punktliste wird hier nicht sortiert,
+die Reihenfolge der Punkte ist irrelevant. Eine sortierte Punktliste
+ist daher überflüssig, die Punkte können direkt über ihre Koordinaten
+im Bild angesprochen werden. Für jeden Punkt muss jedoch eine Liste
+aller Punkte in seinem \fachw{downstream} angelegt werden. Diese
+Listen können je nach verwendeter Konnektivität eine Maximallänge von
+$6$, $14$ oder $22$ Punkten erreichen. In der Regel werden sie aber
+weit weniger Punkte beinhalten, da es nur selten vorkommt, daß ein
+Punkt im \fachw{upstream} all seiner Nachbarn liegt. Eine feste Ausage
+über die Länge dieser Listen ist daher nicht möglich. Ist eine solche
+Liste allerdings einmal gefüllt, ändert sich ihre Länge nicht mehr.
+Die Listen der Nachbarn im \fachw{downstream} eines Punktes können
+daher als Arrays implementiert werden, die bei der Erkennung der
+Nachbarn im \fachw{downstream} mit maximaler Länge ($6$,$14$ oder
+$22$) initialisiert werden. Die erkannten Nachbarn im
+\fachw{downstream} des Punktes werden bei der Erkennung in diesem
+Array abgelegt. Ist die nötige Länge der Liste am Ende der Operation
+bekannt, wird das Array entsprechend gekürzt. Desweiteren speichert
+die Wurzelsuche Zwischenergebnisse einiger Operationen als Bild ab,
+diese Bilder sind in den meisten Fällen temporär. Sie können daher
+gelöscht bzw.  überschrieben werden, wenn sie nicht mehr benötigt
+werden. Das Überschreiben der Bilder ist bei gleichem Datentyp
+problemlos möglich, da die Anzahl der Punkte eines Bildes in jedem
+Fall konstant bleibt.  Der Speicherbedarf dieser Implementaion der
+\fachw{watershed}\hyp{}Transformation kann vor allem aufgrund der
+\fachw{downstream}\hyp{}Listen lediglich auf unter $300$ MByte
+reduziert werden. Es wird angenommen, dass übliche
+Desktop\hyp{}Rechnern über $512$ MByte Arbeitsspeicher verfügen. Die
+Voraussetzungen für die Anwendbarkeit auf solchen Rechnern kann somit
+knapp erfüllt werden. Ein Speicherbedarf von unter $50$ MByte wäre
+realisierbar, wenn die Nachbarn im \fachw{downstream} nicht
+gespeichert würden. Da sie in diesem Fall bei Bedarf immer wieder neu
+ermittelt werden müssten, würde diese ``Optimierung'' die
+Transformation enorm verlangsamen. Die Listen bleiben deshalb vorerst
+erhalten.
+

@@ -1,0 +1,439 @@
+\chapter{Die \fachw{watershed}\hyp{}Transformation}
+\label{cha:watershed}
+
+Voraussetzungen für eine interaktive Objekterkennung in einem
+Grauwertbild ist die Aufteilung des Bildes in Unterobjekte.  Diese
+Vorsegmentierung gruppiert nach dem \fachw{watershed}\hyp{}Verfahren
+\cite{digabel-lantuejoul78,lantuejoul78phd} Punkte, die mit größter
+Wahrscheinlichkeit dem gleichen Objekt angehören. Das heißt, dass die
+Wahrscheinlichkeit, dass diese Punkte einem anderen beliebig kleinen
+Objekt angehören kleiner ist. 
+
+Die \fachw{watershed}\hyp{}Transformation wurde von
+\citet{digabel-lantuejoul78} eingeführt, und später von
+\citet{beucher-lantuejoul79a} verbessert. Sie ist die üblichste
+Methode zur Segmentierung zweidimensionaler Grauwertbilder. Sowohl die
+theoretischen Überlegungen in diesem Kapitel, als auch die
+Implementationen im nächsten Kapitel basieren auf der weiterführenden
+Ausarbeitung von \citet{Roer:wshed} zu diesem Thema.
+
+Ist die Vorsegmentierung abgeschlossen, kann der Anwender die
+entstehenden Unterobjekte daraufhin interaktiv zusammenfügen, um
+daraus die korrekten Objekte zu formen. Der Vorteil besteht darin,
+dass der Nutzer die Kontrolle über die Objekterkennung behält. Er kann
+außerdem bei einem Irrtum seinerseits jederzeit ein beliebiges
+Unterobjekt entfernen, denn die Hauptobjekte sind lediglich Listen der
+Unterobjekte die sie bilden.
+
+\section{Mathematische Grundlagen}
+
+\subsection{Grauwertbilder als Graphen}
+
+\subsubsection{Allgemeine Graphen}
+
+Ein Graph $G=(V,E)$ besteht aus einer Menge von Knoten ($V \subset
+\menge{D}$), sowie einer Menge von Knotenpaaren ($E \subseteq V \times V$).
+Dabei ist $\menge{D}$ ein n-dimensionaler Datenraum in dem die Punkte $V$
+liegen. Die Knotenpaare $E$ werden im Folgenden als Kanten bezeichnet.
+In gerichteten Graphen besteht $E$ aus geordneten Paaren, während in
+ungerichteten Graphen die Reihenfolge der Knoten in den Paaren nicht
+festgelegt ist.  Die Menge der Nachbarn eines Knotens $p$ $N_g(p)$
+ergibt sich aus der Menge aller Knoten $q$, für die es eine Kante
+$(p,q)$ oder $(q,p)$ gibt. Es gilt:
+\[
+N_g(p)=\{\forall q \in V | \exists k \in E : k = (p,q) \vee k= (q,p)\} 
+\]
+
+
+Ein Pfad $\pi(p,q)$ der Länge $\ell$, in einem Graphen $G=(V,E)$ von einem
+Knoten $p$ zu einem weiteren Knoten $q$ ist eine Sequenz von Knoten
+$(p_0,p_1,\pp,p_{\ell-1},p_\ell)$, für die $p_0=p$, $p_\ell=q$
+sowie $\forall i \in [0,\ell): (p_i,p_{i+1}) \in E$ gilt.
+Existiert ein Pfad $\pi(p,q)$, wird $q$ als von $p$ erreichbar
+bezeichnet ($p \rightsquigarrow q$). Ist dabei $p=q$, ist $\pi(p,q)$
+ein Kreis.
+
+
+\subsubsection{Geodätischer Abstand}
+
+Der Geodätische Abstand zwischen zwei Knoten $p,q \in V$ ist die Länge
+$d_V(p,q)$ des kürzesten Pfades zwischen $p$ und $q$ innerhalb der
+Menge $V$. Der Geodätische Abstand zwischen einem Knoten $p$ und einer
+Knotengruppe $P \subset V$ lässt sich daraus ableiten als
+$d_V(p,P)=min_{q \elem{P}}(d_V(p,q))$.
+
+%Bild zur Veranschaulichung???
+
+\subsubsection{Geodätische Einflusszone}
+\label{IZ:B}
+
+$B \subseteq V$ sei unterteilt in k Gruppen zusammenhängender Knoten
+$B_i$ wobei $(i=1 \pp k)$. Dann ist die Geodätische Einflusszone $iz_V
+\subseteq{V}$ wie folgt definiert.
+\[iz_V(B_i) = \{p \elem{V} | \forall i \in [1\pp k ]\backslash \{i\}:d_V(p,B_i)<d_V(p,B_j)\}\]
+$iz_V(B_i)$ sind also alle Punkte $p$ für die gilt, dass alle
+$d_V(p,B_j)$ größer sind als $d_V(p,B_i)$.
+
+Die Menge $IZ_V(B) \subset V$ ist die Vereinigungsmenge aller
+$iz_V(B_i)$ für $i=1...k$, d.h.
+\[IZ_V(B)=\overset{k}{\underset{i = 1}{\bigcup}} iz_V(B_i)\]
+
+Punkte, die zwar Element von $B$, aber nicht von $IZ_V(B)$ sind,
+konnten folglich keiner Einflusszone innerhalb von $B$ eindeutig
+zugeordnet werden. Dies tritt ein, wenn geodätischer Abstand zu
+mindestens zwei verschiedenen $B_i \subseteq B$ gleich ist.
+
+\subsubsection{Wertegraphen}
+
+Die Funktion $f:V \mapsto \menge{X}$ des Wertegraphen $G=(V,E,f)$
+bestimmt für jeden Knoten $p \in V$ einen Wert $f(p) \in \menge{X}$.
+Dabei ist $\menge{X}$ ein meist durch die Anwendung bestimmter Werteraum.
+
+Als Pegelgruppe auf dem Pegel $h$ in einem Wertegraph $G=(V,E,f)$ wird
+eine Gruppe von, durch Kanten verbundenen, Knoten ($p \in V$) mit dem
+selben Wert $f(p)$ bezeichnet. Die Grenze einer Pegelgruppe setzt sich
+aus den Knoten der Pegelgruppe zusammen, deren Nachbarn nicht zur
+Pegelgruppe gehören. Die abfallende Grenze einer Pegelgruppe sind
+Grenzknoten deren Nachbarn niedrigere Werte $f(p)$ haben, während
+Nachbarn von Knoten der Ansteigenden Grenze höhere $f(p)$, als die
+Knoten der Pegelgruppe aufweisen. Als innere Pegelgruppe werden alle
+Knoten der Pegelgruppe bezeichnet, die nicht zur Grenze gehören.
+
+Abfallende Pfade sind Pfade für deren Knoten $\forall i \in [0,\ell):
+f(p_i) \geq f(p_{i+1})$ gilt, während für ansteigende Pfade $\forall
+i \in [0,\ell): (f(p_i) \leq f(p_{i+1}))$ gilt.  $\Pi^\downarrow _f
+(p)$ bezeichnet die Menge aller abfallenden Pfade, die in $p$
+beginnen. Analog dazu ist $\Pi^\uparrow _f (p)$ die Menge aller
+ansteigenden Pfade, die in $p$ beginnen.
+
+Als lokales Minimum wird eine Pegelgruppe $P$ bezeichnet, die keine
+abfallende Grenze hat, d.h. $\forall p \in P : \Pi^\downarrow _f (p)
+= \emptyset$ .
+
+Ein Wertegraph ist Plateaufrei, wenn jeder Knoten, der nicht Teil
+eines lokalen Minima ist, einen ``niedrigeren'' Nachbarn hat. In einem
+solchen Graphen $G=(V,E,f)$ gilt daher $\forall p \in V :
+\Pi^\downarrow _f (p) \neq \emptyset$.
+
+\subsubsection{digitale Grauwertbilder als Wertegraphen}
+
+Ein digitales Grauwertbild ist ein Graph $G=(\menge{D},E,f)$, bei dem
+$\menge{D} \subseteq \menge{Z}^n$ ein Satz von Knoten ist, welche
+jeweils zu ihren Nachbarn Kanten haben können. $n \in \menge{Z}$ ist
+dabei Anzahl der Dimensionen des Bildes. Diese Knoten sollen im
+Folgenden als Punkte bezeichnet werden.  Es sei $E \in [\menge{Z}^n
+\times \menge{Z}^n]$ die Menge aller Kanten zwischen benachbarten
+Punkten.  Die Funktion $f: \menge{D} \mapsto \menge{N}$ weist dabei
+jedem Punkt $p \in \menge{D}$ einen Ganzzahlwert $f(p)$ als Grauwert
+zu.
+
+
+\section{Definitionen der \fachw{watershed}\hyp{}Transformation}
+
+\subsection{Topografischer Abstand in stetigen Bildern}
+
+In einem stetigen Bild existieren keine diskreten Punkte. Der ``Pfad''
+von einer Position, zu einer Anderen innerhalb dieses Wertegebirges
+ist daher eine stetige Kurve. Sind die Punkte $p$ und $q$ Anfang bzw.
+Ende eines solchen Pfades, dann beschreibt die Funktion $\gamma:
+\menge{R} \mapsto \menge{D}$ einen Pfad zwischen beiden wenn $\gamma(0)=p$
+und $\gamma(1)=q$ sind. Für die \fachw{watershed}\hyp{}Transformation sind
+nur stetig absteigende Pfade interessant. Es gilt somit:
+\[
+\forall i \in R : 0 \leq i \leq 1 \rightarrow \int(\gamma(i)) < 0
+\]
+
+Das Minimum aller Ableitungen der Pfade $\gamma$ innerhalb des
+Wertegebirges $\menge{D}$, für die $\gamma(0)=p$ und $\gamma(1)=q$ gilt,
+beschreibt den steilste Absteig von $p$ nach $q$. Die Topografische
+Distanz zwischen $p$ und $q$ ist also definiert als 
+\[
+T_f(p,q)=\underset{\gamma} \min \int_\gamma \| \nabla f(\gamma(s))\|ds
+\]
+
+
+\subsection{\fachw{watershed}\hyp{}Transformation in stetigen Bildern}
+
+Das Bild $G=(\menge{D},E,f)$ habe einen Satz lokaler Minima $\{m_k\}_{k \in
+  I}$ ($I$ sei Menge von Indexen). Der Einzugsbereich $CB(m_i)
+\subseteq \menge{D}$ des lokalen Minimums $m_i$ ist definiert als die Punkte,
+die topografisch dichter an $m_i$ sind als zu jedem anderen lokalen
+Minimum $m_j$ (vergl. Abschnitt \vref{IZ:B} )
+
+\begin{center}
+  $CB(m_i)=\{x \in \menge{D} | \forall j \in I \backslash
+    \{i\}:f(m_i)+T_f(x,m_i)< f(m_j)+T_f(x,m_j)\}$ 
+\end{center}
+
+Eine Wasserscheide $W_{shed}$ ist die Menge der Punkte, die zu keinem
+$CB(m_i)$ gehören. Sie besteht aus Punkten, welche die gleiche
+Entfernung zu mindestens zwei $m_i$ haben. (vergl. Abschnitt \vref{IZ:B} )
+
+\[
+W_{shed}(G)=\menge{D} \cap \left({\underset{i \in I}{\bigcup} CB(m_i)} \right)
+\]
+
+Die \fachw{watershed}\hyp{}Transformation des Bildes $G$ ist eine Abbildung
+$\lambda : \menge{D} \mapsto I \cup \{W\}$, sodass $\lambda(p)=i$, wenn $p \in
+CB(m_i)$ und $\lambda(p)=W$ mit $p \in W_{shed}(f)$ wobei $W \notin I$
+ein frei bestimmter Index ist. Die \fachw{watershed}\hyp{}Transformation
+eines Bildes $G$ weist daher allen Punkten dieses Bildes so Indexe zu,
+dass Punkte eines Einzugsbereiches den gleichen Index bekommen während
+in zwei verschiedenen Einzugsbereichen nie der gleiche Index
+vorkommt.  Punkte, die nicht eindeutig einem Einzugsbereich zugeordnet
+werden können, werden gesondert behandelt werden. Diesen
+``Bergkuppen'' wird ein Index $W \notin I$ zugewiesen.
+
+\subsection{\fachw{watershed}\hyp{}Transformation in diskreten Bildern}
+\label{wshed:diskret}
+
+
+Wird die \fachw{watershed}\hyp{}Transformation für stetige Bilder auf
+diskrete Bilder übertragen, tritt folgendes Problem auf: In diskreten
+Bildern können Gebiete mit konstantem $f(p)$, d.h. mit konstantem
+Grauwert auftreten.  Sind diese Pegelgruppen von ``höheren'' Punkten
+umgeben, lassen sich ihre Punkte noch einfach dem jeweiligen lokalen
+Minima zuordnen.  Jedoch lassen sich Pegelgruppen, die ausschließlich
+von ``niedrigeren'' Punkten umgeben sind, nicht eindeutig zuordnen
+(die \fachw{watershed}\hyp{}Transformation kennt keine ``lokalen
+Maxima'').  Diese Punkte müssen gesondert behandelt werden, was im
+Abschnitt \vref{plateauprob:entw} genauer besprochen wird.
+
+\subsubsection{\fachw{watershed}\hyp{}Transformation durch Absenken}
+
+Der klassische Algorithmus zur \fachw{watershed}\hyp{}Transformation
+durch Absenken nach \citet{vincent} setzt ein digitales Grauwertbild
+mit $f: \menge{D} \mapsto \menge{N}$ vorraus. Das Maximum $h_{max}$
+und das Minimum $h_{min}$ der Grauwerte $f(p)$ aller Punkte $p$
+seien bekannt und es gelte $h_{max}<\infty$ bzw. $h_{min}>-\infty$. Da
+das Bild aus diskreten Punkten besteht, und da $f: \menge{D} \mapsto
+\menge{N}$ eine diskrete Funktion ist, gibt es eine endliche
+Anzahl Werte für $h=f(p)$. Im Bild kommen endlich viele Grauwerte vor.
+Es lässt sich somit über diese Werte iterieren.  $P_h \subseteq
+\menge{D}$ sei die Menge der Punkte deren Grauwert kleiner oder gleich
+$h$ ist, d.h. $P_h=\{\forall p \in \menge{D}:f(p)\leq h\}$. Jede
+Iteration betrachtet lediglich die Menge der Punkte aus ihrem $P_h$.
+In jeder Iteration werden die betrachteten Punkte die innerhalb der
+geodätischen Einflusszone der in der vorherigen Iteration entstandenen
+Einflusszone liegen dieser zugerechnet. Tritt ein neues lokales
+Minimum auf, wird es als neue Geodätische Einflusszone vermerkt.
+Lokale Minima sind immer vollständig Teil eines $P_h$, da alle Punkte
+eines lokalen Minima den selben Grauwert haben. Beginnt die Iteration
+bei $h_{min}$ lässt sich zudem ausschließen, dass Punkte aus dem
+Einzugsgebiet eines noch nicht bekannten Minima betrachtet werden.
+%NOCHMAL CHECKEN
+Für den Algorithmus lässt sich folgende Rekursion definieren.
+
+\[
+\left\{ 
+\begin{matrix}
+X_{h_{min}} &=& \{p \in \menge{D}|f(p) = h_{min} \} = P_{h_{min}}& \\
+X_{h+1} &=& MIN_{h+1} \cup IZ_{P_{h+1}}(X_h),& h \in [h_{min},h_{max}) \\
+\end{matrix} 
+\right.
+\]
+
+Eine Geodätische Einflusszone in $h+1$ kann eine komplett Neue sein,
+oder sie ist ein eine Stufe höher liegender Teil einer Geodätische
+Einflusszone aus $X_h$. In beiden Fällen fließen ihre Punkte in
+$X_{h+1}$ ein.  $MIN_h$ ist dabei die Vereinigung aller lokalen Minima
+mit $f(p)=h$. So sammeln sich alle Punkte, die entweder einem lokalen
+Minima angehören, oder in der Geodätische Einflusszone der einen Pegel
+tiefer liegenden ``Sammlung'' liegen.
+
+Die Wasserscheide $W_{sched}(G)$ ist die Menge der Punkte, die am Ende
+der Iteration ($h=h_{max}$) weder einem bekannten lokalem Minimum
+angehören, noch einer Geodätischen Einflusszone zugeordnet wurden. Es
+gilt $W_{shed}(G)=\menge{D}\backslash X_{h_{max}}$
+
+
+\section{\fachw{watershed}\hyp{}Transformation durch Wurzelsuche}
+
+$G=(\menge{D},E,f)$ sei ein diskretes plateaufreies Grauwertbild. Jeder Punkt
+$p$, der nicht Teil eines lokalen Minimums ist, muss daher mindestens
+einen Nachbarn $q$ haben, so dass $f(p)>f(q)$ gilt.  Der steilste Abhang
+von $p$ ist definiert als
+\[LS(p)= \underset{q \in N_G(p) \cup \{p\}}{\max} \left( \frac{f(p)-f(q)}{d(p,q)} \right)\]
+$N_G(p)$ ist dabei die Menge der Nachbarn von p in $G$. Wenn $p=q$ gilt,
+oder $p$ Teil eines lokales Minima ist, ist $LS(p)$ als $0$ definiert.
+
+\subsection{Topografischer Abstand in diskreten Bildern}
+\label{updownstream}
+
+Die Menge der Nachbarn $q$ von $p$, deren ``Höhendifferenz'' maximal,
+also gleich $LS(p)$ ist, wird als $\Gamma(p)$ bezeichnet. Analog dazu
+heißt die Menge der Punkte $q$, für die $p \in \Gamma(q)$ gilt,
+$\Gamma^{-1}(p)$.
+%vereinfachen
+
+Die Kosten für den Weg von $p$ zu einem Nachbarn $q$ sind definiert als:
+
+\[
+cost(p,q)= \left\{
+\begin{matrix}
+LS(p)*d(p,q) & f(p)>f(q) \\
+LS(q)*d(p,q) & f(p)<f(q) \\
+\frac{1}{2}(LS(p) + LS(q))*d(p,q) & f(p)=f(q) \\
+\end{matrix}
+\right.
+\]
+
+Darauf aufbauend ist die topografische Länge des Pfades $\pi=(p_0,\pp,p_\ell)$ zwischen
+$p_0=p$ und $p_\ell=q$ definiert als:
+
+\[
+T^h _f(p,q) = \underset{i=0}{\overset{l-1}{\sum}}d(p_i,p_{i+1})cost(p_i,p_{i+1})
+\]
+
+Der topografische Abstand zwischen $p$ und $q$ ist das Minimum der
+topografischen Längen aller Pfade zwischen $p$ und $q$
+
+\[
+T_f(p,q) = \underset{\pi \in [p \rightsquigarrow q]}{\min}T^h _f(p,q)
+\]
+
+und der topografische Abstand zwischen $p$ und einer Menge $A
+\subseteq \menge{D}$ ist analog zur geodätischen Distanz
+$T_f(p,A)=\min_{a \in A}T_f(p,a)$
+
+Wir nennen $(p_0,p_1,\pp,p_n)$ den steilsten Abstieg von $p_0=p$ nach
+$p_n=q$ wenn $p_{i+1} \in \Gamma(p_i)$ für alle $i=0,\pp,n-1$ ist. Ein
+Punkt $q$ gehört zum \fachw{downstream} von $p$ wenn es einen steilsten
+Abstieg von $p$ nach $q$ gibt. Ein Punkt $q$ gehört zum \fachw{upstream}
+von $p$, wenn $p$ zum \fachw{downstream} von $q$ gehört.
+
+\subsubsection{Definition}
+\label{wshed_discret:def}
+
+Es sei $f(p)>f(q)$. Der Pfad $\pi(p,q)$ ist genau dann der steilste
+``Abhang'', wenn $T^\pi _f(p,q)=f(p)-f(q)$ ist. Ansonsten gilt $T^\pi
+_f(p,q)>f(p)-f(q)$.
+
+\[
+\forall \pi \in [p \rightsquigarrow q]:\pi = Abstieg_{\max}
+\gdw T^\pi _f(p,q)=f(p)-f(q)
+\]
+\[
+\forall \pi \in [p \rightsquigarrow q]:\pi \neq Abstieg_{\max}
+\rightarrow T^\pi _f(p,q)>f(p)-f(q)
+\]
+
+%Steilste Pfade sind  die topografisch kürzesten Pfade.
+
+Mit der Einführung der topografischen Distanz für diskrete Bilder ist
+die restliche Definition für Einzugsgebiete von lokalen Minima analog
+zum stetigen Fall.
+
+Es folgt, dass $CB(m_i)$ eine Menge von Punkten im \fachw{upstream} des
+lokalen Minima $m_i$ ist. Die Wasserscheide besteht aus den Punkten
+$p$, die im \fachw{upstream} von mindestens zwei lokalen Minima
+liegen. Es gibt also mindestens zwei $\pi_i$, für die
+$T^{\pi_i}_f(p,q_i)=f(p)-f(q_i)$ gilt, wobei $q_i$ lokale Minima sind.
+
+Jeder Punkt $p$ im \fachw{upstream} eines Wasserscheide\hyp{}Punktes $q$ ist
+durch die obige Definition selbst ein Wasserscheide\hyp{}Punkt, denn $q$
+liegt gezwungenermaßen im \fachw{downstream} von $p$, und mit ihm die
+lokalen Minima von $q$.
+
+\subsubsection{Breite Wasserscheiden}
+
+``Breite'' Wasserscheiden treten bei Anwendung der
+\fachw{watershed}\hyp{}Transformation mittels Wurzelsuche immer dann
+auf, wenn sich der am steilsten absteigende Pfad von einem Punkt in
+seiner ``Steilheit'' nur geringfügig von von anderen absteigenden
+Pfaden unterscheidet. Der Grund dafür liegt darin, dass aufgrund der
+endlichen Zahl der Nachbarn eines Punktes nicht die Optimale
+(steilste) Richtung für den Abstieg gewählt werden kann. Auf Ursachen
+und Eindämmung dieses Problem wird später noch genauer eingegangen
+werden. Obwohl dies kein für die Methode der Wurzelsuche spezifisches
+Problem ist, kommt es hier häufiger als z.B. bei der
+Absenken\hyp{}Methode vor.
+
+
+\subsection{Das Plateauproblem}
+\label{plateauprob:entw}
+Bis jetzt wurden Plateaus explizit ausgeschlossen, denn mit der
+bisherigen Definition kann die topologische Distanz zwischen zwei
+Punkten $p$ und $q$ eines Plateaus nicht korrekt bestimmt werden. Es
+wären $f(p)=f(q)$, was zu $LS(p,q)=0$, $cost(p,q)=0$ und schließlich
+zu $T^{\pi}_f(p,q)=0$ führt. Daher muss die Kostenfunktion entweder
+erweitert, oder die Plateaus entfernt werden. Für die Wurzelsuche
+werden Plateaus explizit vor der eigentlichen
+\fachw{watershed}-Transformation entfernt. Die Methode des Absenkens
+behandelt Plateaus direkter. Im Abschnitt \vref{vincent:impl} wird
+genauer darauf eingegangen werden.
+
+\subsubsection{Beseitigung von Plateaus}
+
+Es sei $\Pi^\downarrow _f$ die Menge aller absteigenden Pfade von $p$
+$( p \in \menge{D}[\exists q \in \menge{D}|\forall \pi(p,q) \in \Pi^\downarrow
+_f(p):f(q) < f(p)])$ und $len(\pi)$ sei die geodätische Länge des
+Pfades $\pi$. $G=(\menge{D},E,f)$ sei ein diskretes Bild, und die Funktion
+$d:\menge{D} \mapsto \menge{N}$ sei wie folgt definiert:
+
+\[
+d(p) = \left\{ 
+\begin{matrix}
+0 & \Pi^\downarrow _f(p) = \emptyset \\
+\min_{\pi \in \Pi^\downarrow _f(p)}len(\pi) & sonst\\
+\end{matrix}
+\right.
+\]
+
+Unter der Annahme $L_C = \max_{p\in \menge{D}}d(p)$ wird die Wertefunktion %sicher max ? nochmal prüfen
+$f_{LC}$ des plateaubereinigten Bildes $G_{LC}=(\menge{D},E_{LC},f_{LC})$ basierend
+auf der Wertefunktion $f$ des Originalbildes bestimmt durch:
+
+\[
+f_{LC}(p) = \left\{ 
+\begin{matrix}
+L_C * f(p) & d(p)=0 \\
+L_C * f(p)+d(p)-1 & sonst\\
+\end{matrix}
+\right.
+\]
+
+Die Funktion $d$ hat bei lokalen Minima den Wert $0$, bei allen
+Anderen entspricht $d(p)$ der Länge des Pfades zu Punkten mit
+geringerem Grauwert. Die Relation zwischen den Punkten ist definiert
+durch $x \sqsubset y \gdw f_{LC}(x)< f_{LC}(y)$. Desweiteren muss sich
+auch  der Graph des Bildes ändern. $G_{LC}$ stellt einen
+gerichteten Graphen dar, in dem nur Bögen von ``höheren'' Punkten zu
+``niedrigeren'' Punkten führen. Für $E_{LC} \subseteq \menge{D} \times \menge{D}$ gilt
+also
+
+\[
+(p,q) \in E_{LC} \gdw q \in \Gamma(p)
+\]
+
+%Nach der Transformation nach unterer Grenze $f^* = f_{LC}$ liefert die
+%Funktion $T_{f*}$ eine Distanz in $D' x D'$ wobei $D'=D$ gilt.
+
+%Def:
+%Es sei $G=(D,E,f)$ ein digitales Grauwertbild, der $LC$-Graph ist
+%def. als $(p,p') \in E' \gdw p' \in \Gamma(p)$
+
+Auf dem Gebiet eines Plateaus wird eine Kante von $p$ nach $q$
+erzeugt, wenn die geodätische Distanz zur Kante des Plateaus für $p$
+größer ist, als für $q$. Wenn also $q \sqsubset p$ gilt. Der Graph
+$G_{LC}$ ist durch diese Definition implizit azyklisch.
+
+%\subsubsection{Def: Watershed\hyp{}Transformation nach topologischer  Distanz}
+
+%Es sei $f$ ein Grauwertbild mit $f^* = f_{LC}$ als Untere Grenze von
+%$f$. Es sei $(m_i)_{i \in I}$ die Menge aller Minima von $f$. Das
+%Sammelbecken $CB(m_i)$ von $f$ ist def als das Sammelbecken von $f^*$:
+%
+Die Bestimmung des Einzugsbereichs verhält sich in einem solchen Bild
+wie folgt:
+\[
+CB(m_i)=\left\{ p \in \menge{D} | \forall j \in I \backslash
+  \{i\}:f_{LC}(m_i)+T_{f_{LC}}(p,m_i) < f_{LC}(m_j) + T_{f_{LC}}(p,m_j) \right\}
+\]
+
+%In der Praxis wird der Schritt der ``Unteren Grenze'' oft nicht
+%vollständig ausgeführt. Plateau\hyp{}Pixel werden dann anderweitig einem
+%bestimmten Sammelbecken zugeordnet. Das ist z.B. bei auf sogennanten
+%``geordneten Ketten'' beruhenden Algorithmen der Fall.
+
+

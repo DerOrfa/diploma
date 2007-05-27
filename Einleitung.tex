@@ -1,0 +1,109 @@
+\chapter{Einleitung}
+
+Der Nutzen einer Messmethode hängt in großem Maße davon ab, wie gut
+die erhaltenen Daten interpretiert und angewandt werden können.  In
+der modernen Medizin liefern Kernspintomografen nicht nur punktgenaue
+Informationen über anatomische Details unseres Körpers, sie lassen
+auch Erkenntnisse über natürliche Vorgänge in ihm zu.  So ist durch
+die funktionelle Kernspintomografie inzwischen messbar, welcher äußere
+Reiz in welchem Ausmaß zu erhöhten Aktivitäten in bestimmten Teilen
+des menschlichen Gehirns führt. Obwohl sich die Messtechnik und die
+Methoden zur automatischen Verbesserung der Daten rasant
+weiterentwickeln, müssen diese Informationen noch immer von Menschen
+interpretiert werden, welche oft ihre Probleme mit den komplexen
+Informationen haben.  Es ist daher eine zugleich schwierige, aber auch
+wichtige Aufgabe, die dreidimensionalen Messdaten (Volumendaten) für
+den menschlichen Betrachter entsprechend aufzuarbeiten und geeignet
+darzustellen.
+
+Deshalb befasst sich diese Diplomarbeit mit dem Entwurf und der
+Entwicklung eines sowohl einfachen, als auch flexiblen Systems zur
+Visualisierung und Bearbeitung von Volumendaten.
+
+\section{Motivation}
+
+Die Bildgebungsverfahren der Kernspintomografie (MRI) und der
+funktionellen Kernspintomografie (fMRI) haben in den letzten Jahren
+große technische Fortschritte gemacht. Die Auflösung von
+Kernspintomografen steigt ständig, so dass immer genauere Daten
+ermittelt, und Aktivitäten im Gehirn immer genauer gemessen werden
+können. Auch die mathematischen Modelle zur Erzeugung und Aufbereitung
+der ermittelten Daten werden rapide weiterentwickelt. Ferner stehen im
+Bereich der interaktiven Visualisierung und Verarbeitung der Daten
+einige umfangreiche, professionelle Softwaresysteme zur Verfügung.
+
+\subsection{Verfügbare Mittel der Visualisierung}
+
+Diese Programme sind jedoch oft überdimensioniert und bieten meist mehr
+Funktionalitäten als erforderlich. Neben der unnötigen Erschwerung für
+den Anwender erhöht diese übertriebene Komplexität den Bedarf an
+Ressourcen und verteuert die Softwareprodukte gleichzeitig.
+Außerdem kommt es oft vor, dass trotz des hohen Funktionsumfanges
+gerade das eine Feature, das dringend gebraucht wird, fehlt.  Eine
+Anpassung ist meist nicht nur aus lizenzrechtlichen Gründen
+problematisch, sondern oft auch aufgrund des Umfangs dieser Systeme
+schlicht unmöglich. Was fehlt, ist ein einfaches, flexibles und
+effektives System, das eine möglichst direkte und intuitive
+Visualisierung der Volumendaten erlaubt, und sich auf die
+wesentlichsten Funktionen beschränkt. Gleichzeitig sollte es auf
+gängiger PC\hyp{}Hardware flüssig und stabil betrieben werden können und
+sich leicht anpassen bzw. erweitern lassen.
+
+\subsection{Objekterkennung durch Segmentierung}
+
+Die Erkennung von Strukturen ist eine der üblichsten Aufgaben bei der
+Interpretation der Daten bildgebender Messsysteme. Die durch die
+Kernspintomografie generierten Volumendaten bilden in diesem
+Zusammenhang keine Ausnahme. Aus diesem Grunde finden beim
+Max-Planck-Institut für Kognitions- und Neurowissenschaften (CBS)
+mehrere Algorithmen zur Objekterkennung Anwendung. Diese hoch
+spezialisierten Algorithmen lassen jedoch keinen Nutzereingriff zu.
+Etwaige Erkennungsfehler müssen im Nachhinein mühsam von Hand
+korrigiert werden. Es wäre effektiver diese Fehler im Entstehen zu
+unterbinden, d.h. den Rechner schon im Ansatz zu korrigieren, bevor
+sich der gemachte Fehler ausweitet. 
+
+\section{Zielsetzung}
+Inhalt dieser Diplomarbeit ist der Entwurf und die Realisierung eines
+Programms zur gemeinsamen Visualisierung anatomischer und
+funktioneller Volumendaten mittels einer geeigneten
+Darstellungsstrategie. Das dabei entwickelte Programm soll neben der
+Visualisierung der Volumendaten Werkzeuge für eine interaktive
+Objekterkennung innerhalb dieser Daten bieten.  Es wird daher nötig
+sein, Methoden zur interaktiven Segmentierung zu entwerfen, bei der
+sich Anwender und Rechner gegenseitig unterstützen.  Dieses System
+soll auf zurzeit gängigen Büro\hyp{}PCs möglichst ohne zusätzliche
+Kosten einsetzbar sein.  Daraus folgt, dass seine Anforderungen an die
+Hardware möglichst gering sein sollten und es vor allem ohne
+Spezialhardware auskommen muss. Die Erweiterung und Anpassung dieses
+Programms soll möglichst leicht, und eine Portierung auf andere
+Plattformen mit geringem Aufwand möglich sein.
+
+\section{Aufbau der Arbeit}
+
+\begin{itemize}
+\item Kapitel 2 beschreibt die allgemeinen Grundlagen
+  dreidimensionaler Messungen und der Visualisierung der so
+  ermittelten dreidimensionalen Messdaten auf zweidimensionalen
+  Anzeigesystemen wie z.B. Bildschirmen.
+ 
+\item Kapitel 3 behandelt den Entwurf, und die Implementierung eines
+  auf \fachw{OpenGL} basierenden allgemeinen Basissystems zur
+  Visualisierung dreidimensionaler Szenen. Es werden auch die
+  nötigen mathematischen Grundlagen dieser Visualisierung besprochen.
+  
+\item Kapitel 4 beschreibt den Aufbau einer, auf den in Kapitel 3
+  angestellten Überlegungen basierenden Basisbibliothek. Diese
+  Bibliothek wird die Implementierung und spätere Pflege des
+  eigentlichen Programms erleichtern.
+  
+\item Kapitel 5 schildert die theoretischen Grundlagen einer auf
+  ``Wasserscheiden'' basierenden Segmentierung im Raum, während Kapitel
+  6 zwei Implementierungen dieses Verfahrens behandelt.
+  
+\item Kapitel 7 behandelt die auf den vorherigen Arbeiten basierende
+  Implementation des eigentlichen Visualisierungs- und
+  Bearbeitungssystems und Kapitel 8 schließt diese Arbeit mit einer
+  Zusammenfassung ab.
+
+\end{itemize}

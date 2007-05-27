@@ -1,0 +1,265 @@
+\chapter{Grundlagen und Vorüberlegungen}
+
+\section{Die Magnetresonanztomografie}
+\label{MRI}
+
+Der folgende kurze Abriss der Geschichte der Magnetresonanztomografie
+basiert haupt\-sächlich auf einer Zusammenstellung von \citet{mri} und
+Informationen aus der \citet{wikipedia:mri}.
+
+Felix Bloch und Edward Purcell entdeckten 1946 unabhängig voneinander
+das Prinzip der kernmagnetischen Resonanz (NMR). Wie so oft in der
+Grundlagenforschung wurde anfangs keine Anwendung für diesen
+physikalischen Effekt gesehen, und die Entdeckung blieb relativ
+unbeachtet. Erst ab 1950 wurde die NMR wieder aufgegriffen und für
+chemische und physikalische Analysemethoden weiterentwickelt.  1952
+wurde Felix Bloch und Edward Purcell für ihre Entdeckung den
+Nobelpreis für Physik verliehen.
+
+Eine Anwendung in der Medizin fand die NMR erst 1971, als Raymond
+Damadian nachweisen konnte, dass sich die Magnetresonanzen von
+gesundem Gewebe und von Tumoren unterscheiden.  1972 wurde die auf
+Röntgenstrahlen basierende Computertomografie (CT) eingeführt. Das
+hatte zwar nichts mit der NMR zu tun, zeigte aber, dass Krankenhäuser
+durchaus gewillt waren, große Geldmengen für medizinische
+Untersuchungsgeräte auszugeben. Noch im selben Jahr leitete Paul
+Lauterbur von der CT ein auf NMR basierendes Verfahren ab und konnte
+erste Bilder von kleinen Gewebeproben erzeugen.  Der Grundstein der
+heutigen MRI wurde jedoch erst 1975 von Richard Ernst gelegt, als
+dieser ein auf der Fourier\hyp{}Transformation basierendes
+NMR\hyp{}Bildgebungsverfahren vorstellte.  Anders als die CT hat die
+MRI keine bekannten Nebenwirkungen und kann relativ problemlos, auch
+in kurzen Zeitabständen, an jedem Teil des Körpers durchgeführt
+werden.
+
+Aufgrund des hohen technischen und mathematischen Aufwands konnten
+lange Zeit nur kleine Bilder angefertigt werden.  Erst die rasante
+Entwicklung der Rechentechnik ermöglichte es ab 1980 mittels Ernsts
+Technik innerhalb von 5 Minuten komplette Schnittbilder des Körpers zu
+erzeugen. Bis 1986 wurde diese Zeit weiter auf 5 Sekunden reduziert.
+Außerdem konnten erstmals mehrere Schnitte nacheinander abgebildet und
+zu den heute üblichen Volumendaten zusammengefasst werden.  1991
+erhielt Richard Ernst für seine Arbeit den Nobelpreis für Chemie.
+
+Die ein Jahr später entwickelte funktionelle MRI (fMRI) verwendet das
+von \citet{Ogawa:bold} publizierte BOLD\hyp{}Verfahren um die
+Sauerstoffanreicherung von Blut kernspintomografisch zu erfassen. Da
+sich das Verhältnis von oxigeniertem zu deoxigeniertem Blut zusammen
+mit der Erhöhung der Aktivität in bestimmten Gehirnregionen ändert,
+lässt sich diese Aktivität zeitnah messen.  Diese gemessenen
+Aktivitäten lassen sich dann in direkten zeitlichen Zusammenhang mit
+äußeren Reizen bringen.  Mit Hilfe der fMRI kann somit eine
+dreidimensionale Aktivitätskarte des Gehirns angefertigt werden.
+
+
+\section{Visualisierung dreidimensionaler Daten}
+
+In den letzten Jahren ist die Computergrafik zu einem alltäglichen
+Werkzeug in der Wissenschaft geworden. Vor allem die computergestützte
+Visualisierung, im Folgenden allgemein als \fachw{Renderings}
+bezeichnet, ist für die Darstellung großer und komplexer Datenmengen
+ein gern verwendetes Mittel. Dies trifft besonders auf die
+Visualisierung dreidimensionaler Daten zu. Die zwei wichtigsten
+Methoden des \fachw{Renderings} dreidimensionaler Daten sind das
+\fachw{volume rendering} und der \fachw{Schnitt}.
+
+\subsection{\fachw{Volume rendering}} 
+
+Da dreidimensionale Datensätze meist das Ergebnis einer Messung an
+einem natürlichen dreidimensionalen Objekt sind, also dieses Objekt in
+einer bestimmten Weise repräsentieren, liegt es nahe dieses Objekt
+auch in seiner natürlichen Form darzustellen. Zu diesem Zweck wird
+jedes Datum an dem Punkt im Anzeigeraum abgebildet, an dem es im
+reellen Raum gemessen wurde.  Diese nur in Bereich der
+computergestützten Visualisierung verfügbare Methode wird als
+\fachw{volume rendering} bezeichnet. Sie liefert ein naturgetreues
+Abbild des untersuchten Objektes, das für den Betrachter leicht zu
+erfassen ist.
+
+
+\subsection{Der \fachw{Schnitt}} 
+
+Bei der optischen Mikroskopie wird oft aus dem zu untersuchenden
+Objekt eine dünne Scheibe herausgeschnitten. Diese Scheibe wird
+stellvertretend für das Objekt untersucht, da sich eine dünne Scheibe
+leichter durchleuchten lässt als das ganze Objekt.  Innerhalb der
+Probe kommt es außerdem kaum zu Überlagerungen, da sie so dünn ist.
+
+In der Regel werden mehrere Schnitte angefertigt, um so die innere
+Struktur des Objektes zu bestimmen. Um den mathematischen Aufwand für
+Rückschlüsse aus der Position im Schnitt auf die Position in der Probe
+klein zu halten, werden Schnitte in der Regel parallel zu einer der
+Koordinatenebenen durchgeführt, sie stehen also senkrecht auf einer
+der Koordinatenachsen. Auf dieser Achse lässt sich die Tiefe des
+untersuchten Schnittes leicht ablesen. Die anderen beiden Achsen
+entsprechen genau denen aus dem zweidimensionalen Koordinatensystem
+des Schnittes.
+
+
+%\section{Untersuchung einiger aktuell verfügbarer Visualisierungstools}
+
+\section{Visualisierung mittels \fachw{OpenGL}}
+\label{opengl}
+
+Der Einsatz von \fachw{OpenGL} auf herkömmlichen PCs spielt in der
+Umsetzung des Visualisierungssystems eine zentrale Rolle. Es zahlt
+sich daher aus diesen Bereich der Computergrafik etwas genauer zu
+betrachten.  Kommende Überlegungen und Entscheidungen in Entwurf und
+Implementierung basieren auf diesen Informationen.
+
+\subsection{\fachw{OpenGL} als universelle
+  Visualisierungsschnittstelle}
+
+\fachw{OpenGL} ist eine Softwareschnittstelle zu einem beliebigen
+grafischen Anzeigesystem, im Folgenden \fachw{Renderer} genannt. Das
+System folgt dabei einem Client\hyp{}Server\hyp{}Konzept, wobei der
+\fachw{Renderer} den Server darstellt und die Grafikanwendung den
+Client. Für die meisten gebräuchlichen Sprachen sind
+\fachw{OpenGL}-Funktionsbibliotheken verfügbar. Die Funktionen, die
+diese Bibliotheken zur Verfügung stellen, bilden die standardisierte
+Programmierschnittstelle (API) von \fachw{OpenGL}. Diese
+\fachw{OpenGL-API} wird oft vereinfachend als \fachw{OpenGL}
+bezeichnet. Da \fachw{OpenGL} in hohem Maße standardisiert ist, lassen
+sich verschiedenste \fachw{Renderer} zur Darstellung verwenden, ohne
+dass die Anwendung neu kompiliert werden muss.
+
+Der \fachw{OpenGL}\hyp{}Standard wird von einen Standardisierungsgremium,
+dem ``Architecture Review Board'' (ARB) gepflegt und überwacht, und
+die \fachw{OpenGL\hyp{}API} steht auf allen üblichen Plattformen zur
+Verfügung.  Die Referenzdokumentation, das ``Bluebook'' wird
+regelmäßig aktualisiert vom ARB herausgegeben. Zur Zeit ist die von
+\citet{ref:openGL} überarbeitete Version 1.5 am gebräuchlichsten.
+Anders als z.B. bei \fachw{Direct3D} wird durch die Verwendung von
+\fachw{OpenGL} sowohl auf Client- als auch auf Serverseite die Bindung
+an einen Hersteller oder an eine Plattform vermieden. Das ARB
+spezifiziert genau die Vorbedingungen und die Nachbedingungen jeder
+API\hyp{}Funktion. Es wird jedoch bewusst auf Aussagen zu ihrer
+Implementierung verzichtet. Inzwischen ist ein großer Teil der
+Funktionalität von \fachw{OpenGL} direkt in die Hardware von
+Grafikkarten übernommen worden. Einige Anbieter verwenden auch spezielle
+Multimediabefehlssätze moderner Prozessoren. \fachw{OpenGL} stellt somit eine
+in vielen Fällen hardwarebeschleunigte, jedoch in jedem Fall
+verlässliche und standardisierte Schnittstelle bereit.
+
+\subsection{Der \fachw{Renderer}}
+\label{def:renderer}
+
+Gezeichnet wird bei der \fachw{OpenGL}\hyp{}Architektur immer durch
+den \fachw{Renderer}, der Hauptbestandteil des Servers ist. Server und
+\fachw{Renderer} werden deshalb oft vereinfachend gleich gesetzt. Die
+meisten Renderer sind mit Grafikkarten verwoben, da das Gezeichnete in
+den meisten Fällen auf Bildschirmen angezeigt werden soll.  Durch die
+Übernahme von möglichst vielen Bestandteilen eines Renderers direkt in
+die Hardware der Grafikkarte soll eine möglichst hohe Leistung beim
+Zeichnen erreicht werden. Aufgrund der hohen Komplexität der
+umfangreichen \fachw{OpenGL\hyp{}API} ist dies sehr aufwendig, und
+vollständig hardwareimplementierte Renderer sind nur in wenigen teuren
+Spezialgrafikkarten zu finden. Die meisten Hersteller gehen statt
+dessen einen Kompromiss ein, indem sie seltener verwendete oder zu
+komplexe Teile des \fachw{Renderers} in den Treiber verlagern.  Diese
+vor allem im Consumer\hyp{}Bereich übliche Lösung hat auch den
+Vorteil, dass die Grafikkarte relativ leicht weitere
+Grafikschnittstellen unterstützen kann. Alle Grafikschnittstellen
+basieren auf sehr ähnlichen Grundkonzepten, so dass sie viele
+Funktionalitäten gemeinsam haben. Dieser gemeinsame Nenner wird von
+den Herstellern in ihre Hardware implementiert, während der Treiber
+als Mittler fungiert und Unterschiede ausgleicht.
+
+Allgemein lassen sich \fachw{Renderer} in die zwei Gruppen
+\fachw{Softwarerenderer} und \fachw{Hardwarerenderer} unterteilen.
+Nur komplett in Software implementierte \fachw{Renderer} werden
+gemeinhin als \fachw{Softwarerenderer} bezeichnet. Als
+\fachw{Hardwarerenderer} gelten dagegen üblicherweise schon Renderer
+die nur den wichtigsten Teil ihrer Funktionalität in Hardware
+ausführen. Da die Implementation komplexer geometrischer Algorithmen
+in Hardware sehr viel aufwendiger ist als in Software, galt der Preis
+einer Grafikkarte lange Zeit als Maß des Anteils
+hardwareimplementierter Funktionalität in dieser Grafikkarte.
+
+Mit der Massenproduktion im Consumer\hyp{}Markt ist der Anteil der
+Implementationskosten für den \fachw{Renderer} und somit der Anteil
+der Entwicklungskosten einer Grafikkarte gemessen an den Produktkosten
+jedoch erheblich geschrumpft. Consumer\hyp{}3D\hyp{}Grafikkarten kann
+so trotz hoher Entwurfskosten immer mehr Funktionalität direkt in die
+Hardware integriert werden. Gleichzeitig entstehen neue Prioritäten,
+welche Funktionalität in Hardware verfügbar sein sollte.  Da
+Consumer\hyp{}3D\hyp{}Grafikkarten praktisch ausschließlich auf Spiele
+ausgelegt sind, wird vielen Funktionen professioneller
+\fachw{Renderer} zugunsten anderer, für Spiele wichtigerer Funktionen
+weniger Bedeutung beigemessen. Zum Beispiel werden im professionellen
+Bereich oft Drahtgitter und einfarbige Flächen dargestellt. Im
+Gegensatz dazu liegt der Fokus bei Spielen vor allem bei texturierten
+Flächen.  Dies zeigt sich im Verhalten der verschiedenen Grafikkarten.
+Während Consumer\hyp{}\fachw{Renderer} zum Beispiel beim Zeichnen von
+Drahtgittermodellen extrem schlechte Leistungen zeigen, zeichnen sie
+die eigentlich aufwändigeren texturierten Flächen mit enormer
+Geschwindigkeit.
+
+\fachw{Hardwarerenderer} für den Consumer\hyp{}Markt werden zur Zeit
+fast ausschließlich von \citet{nvidia} oder \citet{ati} geliefert.
+Die von nVidia zentral angebotenen Treiber sind schon längere Zeit für
+verschiedene 32Bit und 64Bit Plattformen verfügbar. Im
+Unix\hyp{}Bereich waren daher bisher vor allem
+nVidia\hyp{}\fachw{Renderer} verbreitet. ATI verbessert jedoch seit
+kurzem seine bisher schwache Unterstützung von
+nicht\hyp{}Windows\hyp{}Betriebssystemen und bietet inzwischen auch
+64-Bit\hyp{}Treiber an.
+
+\fachw{Softwarerenderer} sind meist mit dem Betriebssystem gelieferte
+Ersatzrenderer, die die Funktionsfähigkeit \fachw{OpenGL}\hyp{}basierter
+Anwendungen sicherstellen sollen.  Neben den herstellerspezifischen
+\fachw{Softwarerendereren} ist vor allem auf Unix\hyp{}Systemen das
+unter der \citet{MIT:license} stehende Mesa \cite{mesa} stark verbreitet.
+
+Mesa zeichnet sich vor allem dadurch aus, dass es den Renderer
+nocheinmal in eine Schnittstelle (auf die die \fachw{OpenGL\hyp{}API}
+aufsetzt) und einen ausführenden Teil unterteilt. Die
+softwareimplementierte Funktionalität des ausführenden Teils steht
+dabei als Satz leicht austauschbarer Funktionszeiger zur Verfügung.
+Einige ``Treibermodule'' für Grafikkarten, die selbst entweder keine
+oder nur eine unzureichende \fachw{OpenGL}\hyp{}Schnittstelle haben, machen
+sich das zu nutze.  Ist es bei einer Grafikkarte möglich, eine
+bestimmte Funktionalität hardwarebeschleunigt zu implementieren, dann
+ersetzen sie den Zeiger auf die entsprechende reine Software\hyp{}Funktion
+durch den Zeiger auf ihre eigene, ganz oder teilweise
+hardwarebeschleunigte Funktion. Dies ist z. B. oft bei den für das
+Rastern zuständigen Funktionen möglich, da hier nur noch
+zweidimensional gezeichnet wird.  In der Regel kann jede moderne
+Grafikkarte zweidimensionale Zeichenoperationen, wie z.B. das Zeichnen
+von Polygonen u.Ä., hardwarebeschleunigt ausführen.  Mesa ist also
+nicht einfach nur ein \fachw{Softwarerenderer}, sondern kann
+auch ein Mittel sein, ``schwacher'' oder inkompatibler Hardware
+mittels Kompatibilitätsschicht entgegen zu kommen.
+
+\subsection{Die Architektur von \fachw{OpenGL}}
+\label{opengl:arch}
+
+Die \fachw{OpenGL\hyp{}API} abstrahiert den \fachw{Renderer} zu einer
+Zustandsmaschine, die auf gegebenen Ortsvektoren aus $R^3$
+Transformationen mittels mehrerer Matrizen anwendet.  Auf diesem
+mathematischen Wege werden jegliche Tranformationen des zu zeichnenden
+Ortsvektors $\left( \menge{R}^3 \mapsto \menge{R}^3 \right)$ sowie
+perspektivische Verzerrung und Projektion auf die Projektionsfläche $\left(
+  \menge{R}^3 \mapsto \menge{R}^2 \right)$ realisiert. Die Projektionsfläche
+kann vereinfachend mit der Oberfläche des Bildschirms gleichgesetzt
+werden. Da die meisten Darstellungsmedien diskrete Koordinatensysteme
+verwenden, werden die Ergebnisse der Projektion gegebenenfalls noch
+gerastert $\left( \menge{R}^2 \mapsto \menge{N}^2 \right)$.  Die so
+ermittelten Vektoren aus $\menge{N}^2$ werden dann verwendet, um
+Farbinformationen in das entsprechende Darstellungsmedium zu
+schreiben.  Diese Farbinformationen können entweder direkter oder
+indirekter Natur sein.  Direkte Farbinformationen werden aus einem
+vorbereiteten n-dimensionalen Puffer, einer Textur, gelesen.  Mittels,
+durch Texturkoordinaten bestimmten Matrixoperationen $\left(
+  \menge{R}^n \mapsto \menge{R}^3 \right)$ werden diese Farbwerte dann
+in den Raum projiziert.  Indirekte Farbinformationen sind durch
+lineare Funktionen interpolierte Farbwerte, wobei diese Funktionen
+durch den Ortsvektor parametrisiert werden.  Dazu kommen noch die so
+genannten Shader, kleine Programme, die ähnlich einer Textur den
+Farbwert für jedes einzelne Pixel bestimmen.   Da diese
+Shaderprogramme  als Algorithmus für jeden einzelnen dargestellten
+Punkt ausgeführt werden müssen, sind sie sehr rechenzeitaufwendig und
+werden deshalb üblicherweise direkt vom Grafikchip ausgeführt.  Die
+durch diese drei Methoden bestimmten Farbwerte lassen sich mittels
+\fachw{Multitexturing} beliebig kombinieren.
+
